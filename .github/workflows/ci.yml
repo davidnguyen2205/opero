@@ -26,9 +26,14 @@ jobs:
         run: go vet ./...
 
       - name: golangci-lint
-        uses: golangci/golangci-lint-action@v6
+        uses: golangci/golangci-lint-action@v7
         with:
           working-directory: backend
+          # Pin to the exact v2 version that passes locally. The repo's
+          # .golangci.yml is v2-format ("version: 2"), which golangci-lint v1
+          # cannot parse — and action@v6 installs v1. action@v7 + a v2 version
+          # is required.
+          version: v2.12.2
 
       - name: test
         run: go test ./...
