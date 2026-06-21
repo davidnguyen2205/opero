@@ -302,6 +302,128 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/employees/{id}/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Provision a login for an employee.
+         * @description Creates a control-plane user account for the employee and links it (employees.user_id), so the employee can authenticate (e.g. field staff on the mobile app). Fails if the employee already has a login or the email is already taken in this tenant.
+         */
+        post: operations["createEmployeeLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attendance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List attendance records.
+         * @description Lists attendance records, optionally filtered by employee, status, and a [from, to) window on check-in time.
+         */
+        get: operations["listAttendance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attendance/check-in": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check in (field staff).
+         * @description Records a check-in for the authenticated employee (resolved from the token). Idempotent on client_id: replaying the same client_id returns the existing record rather than creating a duplicate — this is what makes the offline mobile queue safe to replay.
+         */
+        post: operations["checkIn"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/attendance/check-out": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Check out (field staff).
+         * @description Records check-out against an existing attendance record identified by the same client_id used at check-in. Idempotent.
+         */
+        post: operations["checkOut"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/shifts": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the authenticated employee's own shifts.
+         * @description Field-facing: returns shifts for the employee linked to the caller's login (resolved from the token), optionally filtered by status and a [from, to) window on start time. Returns an empty list if the caller has no linked employee record.
+         */
+        get: operations["listMyShifts"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/live": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Manager live view — who is working now.
+         * @description Published shifts whose start time falls in the window, each joined with the employee and their current attendance state. The window defaults to the current UTC day; clients should pass from/to computed in the user's local timezone for correct day boundaries (the server has no tenant timezone). Shifts that started before the window (e.g. overnight) are not included — the filter is on shift start time.
+         */
+        get: operations["getLiveView"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -559,6 +681,91 @@ export interface components {
             /** Format: date-time */
             ends_at?: string;
             notes?: string | null;
+        };
+        CreateLoginRequest: {
+            /** Format: email */
+            email: string;
+            /** Format: password */
+            password: string;
+            /**
+             * @description Defaults to employee when omitted.
+             * @enum {string}
+             */
+            role?: "admin" | "manager" | "employee";
+        };
+        AttendanceRecord: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            employee_id: string;
+            /** Format: uuid */
+            shift_id?: string | null;
+            /**
+             * Format: uuid
+             * @description Client-generated id; the idempotency key for check-in/out.
+             */
+            client_id: string;
+            /** Format: date-time */
+            check_in_at?: string | null;
+            /** Format: double */
+            check_in_lat?: number | null;
+            /** Format: double */
+            check_in_lng?: number | null;
+            check_in_photo_url?: string | null;
+            /** Format: date-time */
+            check_out_at?: string | null;
+            /** Format: double */
+            check_out_lat?: number | null;
+            /** Format: double */
+            check_out_lng?: number | null;
+            check_out_photo_url?: string | null;
+            /** @enum {string} */
+            status: "checked_in" | "checked_out" | "missed";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CheckInRequest: {
+            /**
+             * Format: uuid
+             * @description Client-generated idempotency key (stable across offline retries).
+             */
+            client_id: string;
+            /** Format: uuid */
+            shift_id?: string | null;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lng?: number | null;
+            photo_url?: string | null;
+        };
+        CheckOutRequest: {
+            /**
+             * Format: uuid
+             * @description The same client_id used at check-in.
+             */
+            client_id: string;
+            /** Format: double */
+            lat?: number | null;
+            /** Format: double */
+            lng?: number | null;
+            photo_url?: string | null;
+        };
+        LiveViewEntry: {
+            /** Format: uuid */
+            employee_id: string;
+            employee_name: string;
+            shift: components["schemas"]["Shift"];
+            /**
+             * @description Derived state for this shift: not_checked_in (no attendance record linked), checked_in, or checked_out.
+             * @enum {string}
+             */
+            attendance_status: "not_checked_in" | "checked_in" | "checked_out";
+            /** Format: date-time */
+            check_in_at?: string | null;
+            /** Format: date-time */
+            check_out_at?: string | null;
         };
     };
     responses: {
@@ -1331,6 +1538,196 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+        };
+    };
+    createEmployeeLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Login created and linked to the employee. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            /** @description The employee already has a login, or the email is taken. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    listAttendance: {
+        parameters: {
+            query?: {
+                employee_id?: string;
+                status?: "checked_in" | "checked_out" | "missed";
+                /** @description Inclusive lower bound on check_in_at (ISO-8601). */
+                from?: string;
+                /** @description Exclusive upper bound on check_in_at (ISO-8601). */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Matching attendance records. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    checkIn: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckInRequest"];
+            };
+        };
+        responses: {
+            /** @description Existing record returned (idempotent replay). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"];
+                };
+            };
+            /** @description Checked in. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description The client_id is already in use by another employee. */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Error"];
+                };
+            };
+        };
+    };
+    checkOut: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CheckOutRequest"];
+            };
+        };
+        responses: {
+            /** @description Checked out (or already checked out — idempotent). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listMyShifts: {
+        parameters: {
+            query?: {
+                status?: "draft" | "published";
+                /** @description Inclusive lower bound on starts_at (ISO-8601). */
+                from?: string;
+                /** @description Exclusive upper bound on starts_at (ISO-8601). */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's shifts, ordered by start time. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Shift"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getLiveView: {
+        parameters: {
+            query?: {
+                /** @description Inclusive lower bound on shift starts_at (ISO-8601). Defaults to start of the current UTC day. */
+                from?: string;
+                /** @description Exclusive upper bound on shift starts_at (ISO-8601). Defaults to start of the next UTC day. */
+                to?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Live view entries, ordered by shift start time. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LiveViewEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
         };
     };
 }

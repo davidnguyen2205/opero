@@ -8,6 +8,7 @@ export type Employee = components["schemas"]["Employee"];
 export type Location = components["schemas"]["Location"];
 export type Role = components["schemas"]["Role"];
 export type Shift = components["schemas"]["Shift"];
+export type LiveViewEntry = components["schemas"]["LiveViewEntry"];
 
 export type CreateDepartmentRequest =
   components["schemas"]["CreateDepartmentRequest"];
@@ -182,6 +183,18 @@ export const shiftsApi = {
     await unwrapEmpty(
       await api.DELETE("/shifts/{id}", { params: { path: { id } } }),
       "Unable to delete shift.",
+    );
+  },
+};
+
+// Manager live view ("who's working now"): published shifts in a window joined
+// with current attendance state. Window defaults to the current UTC day when
+// from/to are omitted; pass local-day bounds for correct timezone behavior.
+export const liveApi = {
+  async list(filters: { from?: string; to?: string } = {}): Promise<LiveViewEntry[]> {
+    return unwrap(
+      await api.GET("/live", { params: { query: filters } }),
+      "Unable to load the live view.",
     );
   },
 };

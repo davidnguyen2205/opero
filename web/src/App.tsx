@@ -1,9 +1,10 @@
 import { Children, useCallback, useEffect, useMemo, useState } from "react";
-import type { FormEvent, ReactNode } from "react";
+import type { CSSProperties, FormEvent, ReactNode } from "react";
 import {
   authApi,
   departmentsApi,
   employeesApi,
+  liveApi,
   locationsApi,
   rolesApi,
   setAuthToken,
@@ -17,23 +18,66 @@ import {
   type CurrentUserResponse,
   type Department,
   type Employee,
+  type LiveViewEntry,
   type Location,
   type Role,
   type Shift,
 } from "./api/resources";
 
-type View = "roster" | "people" | "departments" | "roles" | "locations";
+type View = "live" | "roster" | "people" | "departments" | "roles" | "locations";
 type AuthMode = "login" | "signup";
 
 type FormState = Record<string, string>;
 
-const views: { id: View; label: string }[] = [
-  { id: "roster", label: "Roster" },
-  { id: "people", label: "People" },
-  { id: "departments", label: "Departments" },
-  { id: "roles", label: "Roles" },
-  { id: "locations", label: "Locations" },
+const views: { id: View; label: string; section: string; icon: IconName }[] = [
+  { id: "live", label: "Live", section: "Operations", icon: "activity" },
+  { id: "roster", label: "Roster", section: "Operations", icon: "calendar" },
+  { id: "people", label: "People", section: "People", icon: "users" },
+  { id: "departments", label: "Departments", section: "People", icon: "grid" },
+  { id: "roles", label: "Roles", section: "People", icon: "briefcase" },
+  { id: "locations", label: "Locations", section: "Operations", icon: "pin" },
 ];
+
+const navSections = ["Operations", "People"];
+
+const shiftColors = [
+  "#ea580c",
+  "#2563eb",
+  "#7c3aed",
+  "#0d9488",
+  "#db2777",
+  "#d97706",
+  "#15803d",
+  "#4b5563",
+];
+
+type IconName =
+  | "activity"
+  | "calendar"
+  | "users"
+  | "grid"
+  | "briefcase"
+  | "pin"
+  | "plus"
+  | "refresh"
+  | "send"
+  | "x";
+
+const iconPaths: Record<IconName, string> = {
+  activity: "M22 12h-4l-3 9L9 3l-3 9H2",
+  calendar:
+    "M8 2v4M16 2v4M3 10h18M5 4h14a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z",
+  users:
+    "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 11a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75",
+  grid: "M3 3h7v7H3zM14 3h7v7h-7zM14 14h7v7h-7zM3 14h7v7H3z",
+  briefcase:
+    "M20 7H4a2 2 0 0 0-2 2v9a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2zM16 7V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v2",
+  pin: "M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0zM12 10a2 2 0 1 0 0-4 2 2 0 0 0 0 4z",
+  plus: "M12 5v14M5 12h14",
+  refresh: "M23 4v6h-6M1 20v-6h6M3.51 9a9 9 0 0 1 14.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0 0 20.49 15",
+  send: "M22 2 11 13M22 2l-7 20-4-9-9-4 20-7z",
+  x: "M18 6 6 18M6 6l12 12",
+};
 
 const employmentTypes: Employee["employment_type"][] = [
   "full_time",
@@ -88,8 +132,89 @@ function namesById<T extends { id: string; name: string }>(
   return new Map(items.map((item) => [item.id, item.name]));
 }
 
-function employeeNamesById(items: Employee[]): Map<string, string> {
-  return new Map(items.map((item) => [item.id, item.full_name]));
+function initials(name: string): string {
+  const parts = name.trim().split(/\s+/);
+  if (parts.length === 1) {
+    return parts[0].slice(0, 2).toUpperCase();
+  }
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+function startOfWeek(date: Date): Date {
+  const copy = new Date(date);
+  const day = copy.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  copy.setDate(copy.getDate() + diff);
+  copy.setHours(0, 0, 0, 0);
+  return copy;
+}
+
+function weekDays(anchor = new Date()): Date[] {
+  const start = startOfWeek(anchor);
+  return Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    return date;
+  });
+}
+
+function sameDay(a: Date, b: Date): boolean {
+  return (
+    a.getFullYear() === b.getFullYear() &&
+    a.getMonth() === b.getMonth() &&
+    a.getDate() === b.getDate()
+  );
+}
+
+function formatDayHeader(date: Date): { dow: string; day: string } {
+  return {
+    dow: new Intl.DateTimeFormat(undefined, { weekday: "short" }).format(date),
+    day: new Intl.DateTimeFormat(undefined, { day: "2-digit" }).format(date),
+  };
+}
+
+function formatTime(value: string): string {
+  return new Intl.DateTimeFormat(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+  }).format(new Date(value));
+}
+
+function colorForId(id: string): string {
+  let total = 0;
+  for (const char of id) {
+    total += char.charCodeAt(0);
+  }
+  return shiftColors[total % shiftColors.length];
+}
+
+function Icon({
+  name,
+  size = 18,
+}: {
+  name: IconName;
+  size?: number;
+}) {
+  return (
+    <svg
+      aria-hidden="true"
+      fill="none"
+      height={size}
+      stroke="currentColor"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      strokeWidth="1.75"
+      viewBox="0 0 24 24"
+      width={size}
+    >
+      {iconPaths[name]
+        .split("M")
+        .filter(Boolean)
+        .map((segment, index) => (
+          <path d={`M${segment}`} key={index} />
+        ))}
+    </svg>
+  );
 }
 
 function App() {
@@ -103,6 +228,7 @@ function App() {
   const [locations, setLocations] = useState<Location[]>([]);
   const [roles, setRoles] = useState<Role[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
+  const [live, setLive] = useState<LiveViewEntry[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -114,13 +240,14 @@ function App() {
     setLoading(true);
     setError(null);
     try {
-      const [me, deps, emps, locs, roleList, shiftList] = await Promise.all([
+      const [me, deps, emps, locs, roleList, shiftList, liveList] = await Promise.all([
         authApi.me(),
         departmentsApi.list(),
         employeesApi.list(),
         locationsApi.list(),
         rolesApi.list(),
         shiftsApi.list(),
+        liveApi.list(),
       ]);
       setCurrentUser(me);
       setDepartments(deps);
@@ -128,6 +255,7 @@ function App() {
       setLocations(locs);
       setRoles(roleList);
       setShifts(shiftList);
+      setLive(liveList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load data.");
     } finally {
@@ -142,7 +270,6 @@ function App() {
   const departmentNames = useMemo(() => namesById(departments), [departments]);
   const roleNames = useMemo(() => namesById(roles), [roles]);
   const locationNames = useMemo(() => namesById(locations), [locations]);
-  const employeeNames = useMemo(() => employeeNamesById(employees), [employees]);
 
   async function completeAuth(result: AuthResponse): Promise<void> {
     setAuthToken(result.token);
@@ -159,6 +286,7 @@ function App() {
     setLocations([]);
     setRoles([]);
     setShifts([]);
+    setLive([]);
     setNotice(null);
     setError(null);
   }
@@ -189,39 +317,67 @@ function App() {
     <div className="app-shell workspace">
       <aside className="sidebar">
         <div className="brand">
-          <strong>Opero</strong>
-          <span>{currentUser?.tenant.name ?? auth.tenant.name}</span>
+          <div className="brand-mark">O</div>
+          <div>
+            <strong>Opero</strong>
+            <span>{currentUser?.tenant.name ?? auth.tenant.name}</span>
+          </div>
+        </div>
+        <div className="sidebar-search">
+          <span>⌕</span>
+          <span>Search</span>
+          <kbd>⌘K</kbd>
         </div>
         <nav className="nav-list" aria-label="Primary">
-          {views.map((item) => (
-            <button
-              className={view === item.id ? "active" : ""}
-              key={item.id}
-              onClick={() => setView(item.id)}
-              type="button"
-            >
-              {item.label}
-              <span>{countForView(item.id, { departments, employees, locations, roles, shifts })}</span>
-            </button>
+          {navSections.map((section) => (
+            <div className="nav-section" key={section}>
+              <div className="nav-section-label">{section}</div>
+              {views
+                .filter((item) => item.section === section)
+                .map((item) => (
+                  <button
+                    className={view === item.id ? "active" : ""}
+                    key={item.id}
+                    onClick={() => setView(item.id)}
+                    type="button"
+                  >
+                    <Icon name={item.icon} size={16} />
+                    <span>{item.label}</span>
+                    <b>
+                      {countForView(item.id, {
+                        departments,
+                        employees,
+                        locations,
+                        roles,
+                        shifts,
+                        live,
+                      })}
+                    </b>
+                  </button>
+                ))}
+            </div>
           ))}
         </nav>
         <div className="session-card">
-          <span>Signed in as</span>
-          <strong>{currentUser?.user.email ?? auth.user.email}</strong>
-          <span>{humanize(currentUser?.user.role ?? auth.user.role)}</span>
+          <div className="avatar avatar-sm">
+            {initials(currentUser?.user.email ?? auth.user.email)}
+          </div>
+          <div>
+            <strong>{currentUser?.user.email ?? auth.user.email}</strong>
+            <span>{humanize(currentUser?.user.role ?? auth.user.role)}</span>
+          </div>
           <button className="secondary-btn" onClick={signOut} type="button">
             Sign out
           </button>
         </div>
       </aside>
 
-      <main className="content">
+      <main className="main-shell">
         <header className="topbar">
-          <div>
-            <h1>{views.find((item) => item.id === view)?.label}</h1>
-            <p className="muted">
-              Manage field operations against the current OpenAPI contract.
-            </p>
+          <div className="breadcrumb">
+            <span>Workspace</span>
+            <span>/</span>
+            <strong>{views.find((item) => item.id === view)?.label}</strong>
           </div>
           <button
             className="secondary-btn"
@@ -229,23 +385,26 @@ function App() {
             onClick={() => void loadData()}
             type="button"
           >
+            <Icon name="refresh" size={15} />
             {loading ? "Refreshing" : "Refresh"}
           </button>
         </header>
 
-        <section className="dashboard-grid" aria-label="Operational summary">
-          <Metric label="Active employees" value={activeEmployees.length} />
-          <Metric label="Departments" value={departments.length} />
-          <Metric label="Published shifts" value={publishedShifts.length} />
-          <Metric label="Locations" value={locations.length} />
-        </section>
+        <div className="content">
+          <section className="dashboard-grid" aria-label="Operational summary">
+            <Metric label="Active employees" value={activeEmployees.length} />
+            <Metric label="Departments" value={departments.length} />
+            <Metric label="Published shifts" value={publishedShifts.length} />
+            <Metric label="Locations" value={locations.length} />
+          </section>
 
-        {error ? <div className="error-banner">{error}</div> : null}
-        {notice ? <div className="notice-banner">{notice}</div> : null}
+          {error ? <div className="error-banner">{error}</div> : null}
+          {notice ? <div className="notice-banner">{notice}</div> : null}
+
+        {view === "live" ? <LiveView entries={live} /> : null}
 
         {view === "roster" ? (
           <RosterView
-            employeeNames={employeeNames}
             employees={employees}
             locationNames={locationNames}
             locations={locations}
@@ -368,6 +527,7 @@ function App() {
             }
           />
         ) : null}
+        </div>
       </main>
     </div>
   );
@@ -381,6 +541,7 @@ function countForView(
     locations: Location[];
     roles: Role[];
     shifts: Shift[];
+    live: LiveViewEntry[];
   },
 ): number {
   switch (view) {
@@ -394,6 +555,8 @@ function countForView(
       return data.roles.length;
     case "roster":
       return data.shifts.length;
+    case "live":
+      return data.live.length;
   }
 }
 
@@ -402,6 +565,64 @@ function Metric({ label, value }: { label: string; value: number }) {
     <div className="metric">
       <span>{label}</span>
       <strong>{value}</strong>
+    </div>
+  );
+}
+
+const liveStatusLabels: Record<LiveViewEntry["attendance_status"], string> = {
+  not_checked_in: "Not checked in",
+  checked_in: "On shift",
+  checked_out: "Checked out",
+};
+
+function LiveView({ entries }: { entries: LiveViewEntry[] }) {
+  const onShift = entries.filter((e) => e.attendance_status === "checked_in").length;
+  return (
+    <div className="card">
+      <div className="section-head">
+        <h2>Who's working now</h2>
+        <span className="table-note">
+          {onShift} on shift · {entries.length} scheduled
+        </span>
+      </div>
+      {entries.length ? (
+        <div className="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Employee</th>
+                <th>Shift</th>
+                <th>Status</th>
+                <th>Checked in</th>
+                <th>Checked out</th>
+              </tr>
+            </thead>
+            <tbody>
+              {entries.map((e) => (
+                <tr key={e.shift.id}>
+                  <td>
+                    <strong>{e.employee_name}</strong>
+                  </td>
+                  <td>
+                    {formatDateTime(e.shift.starts_at)} → {formatDateTime(e.shift.ends_at)}
+                  </td>
+                  <td>
+                    <span
+                      className={`pill ${e.attendance_status === "not_checked_in" ? "warn" : ""}`}
+                    >
+                      {liveStatusLabels[e.attendance_status]}
+                    </span>
+                  </td>
+                  <td>{e.check_in_at ? formatDateTime(e.check_in_at) : "—"}</td>
+                  <td>{e.check_out_at ? formatDateTime(e.check_out_at) : "—"}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      ) : (
+        <div className="empty-state">No published shifts in the current window.</div>
+      )}
     </div>
   );
 }
@@ -583,7 +804,6 @@ function AuthScreen({
 
 function RosterView({
   employees,
-  employeeNames,
   locations,
   locationNames,
   onCreate,
@@ -592,7 +812,6 @@ function RosterView({
   shifts,
 }: {
   employees: Employee[];
-  employeeNames: Map<string, string>;
   locations: Location[];
   locationNames: Map<string, string>;
   onCreate: (body: CreateShiftRequest) => Promise<void>;
@@ -602,6 +821,7 @@ function RosterView({
 }) {
   const now = dateTimeLocalFromIso(new Date().toISOString());
   const later = dateTimeLocalFromIso(new Date(Date.now() + 3_600_000).toISOString());
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [form, setForm] = useState<FormState>({
     employee_id: "",
     ends_at: later,
@@ -624,137 +844,284 @@ function RosterView({
       starts_at: toIsoFromLocal(form.starts_at),
     });
     setForm((current) => ({ ...current, notes: "" }));
+    setDrawerOpen(false);
+  }
+
+  const days = weekDays();
+  const today = new Date();
+  const draftCount = shifts.filter((shift) => shift.status === "draft").length;
+  const activeEmployees = employees.filter((employee) => employee.status === "active");
+  const displayedEmployees = activeEmployees.length ? activeEmployees : employees;
+
+  function openDrawer(employeeId?: string, day?: Date): void {
+    setForm((current) => {
+      const start = day ? new Date(day) : new Date();
+      start.setHours(10, 0, 0, 0);
+      const end = new Date(start);
+      end.setHours(start.getHours() + 3);
+      return {
+        ...current,
+        employee_id: employeeId ?? current.employee_id,
+        starts_at: day ? dateTimeLocalFromIso(start.toISOString()) : current.starts_at,
+        ends_at: day ? dateTimeLocalFromIso(end.toISOString()) : current.ends_at,
+      };
+    });
+    setDrawerOpen(true);
   }
 
   return (
-    <section className="page-grid roster-grid">
-      <div className="card">
-        <div className="section-head">
-          <h2>Shifts</h2>
-          <span className="table-note">{shifts.length} total</span>
+    <section className="roster-screen">
+      <div className="roster-head">
+        <div>
+          <h1>Roster</h1>
+          <div className="week-selector">
+            <button className="icon-btn" type="button">‹</button>
+            <span>
+              Week of{" "}
+              {new Intl.DateTimeFormat(undefined, {
+                day: "2-digit",
+                month: "short",
+              }).format(days[0])}{" "}
+              -{" "}
+              {new Intl.DateTimeFormat(undefined, {
+                day: "2-digit",
+                month: "short",
+                year: "numeric",
+              }).format(days[6])}
+            </span>
+            <button className="icon-btn" type="button">›</button>
+          </div>
         </div>
-        {shifts.length ? (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Location</th>
-                  <th>Start</th>
-                  <th>End</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {shifts.map((shift) => (
-                  <tr key={shift.id}>
-                    <td>{employeeNames.get(shift.employee_id) ?? "Unknown employee"}</td>
-                    <td>
-                      {shift.location_id
-                        ? locationNames.get(shift.location_id) ?? "Unknown location"
-                        : "Unassigned"}
-                    </td>
-                    <td>{formatDateTime(shift.starts_at)}</td>
-                    <td>{formatDateTime(shift.ends_at)}</td>
-                    <td>
-                      <span className={`pill ${shift.status === "draft" ? "warn" : ""}`}>
-                        {shift.status}
-                      </span>
-                    </td>
-                    <td>
-                      <div className="row-actions">
-                        {shift.status === "draft" ? (
-                          <button
-                            className="secondary-btn"
-                            onClick={() => void onPublish(shift.id)}
-                            type="button"
-                          >
-                            Publish
-                          </button>
-                        ) : null}
+        <div className="roster-actions">
+          {draftCount ? <span className="chip orange">{draftCount} unpublished</span> : null}
+          <button
+            className="secondary-btn"
+            onClick={() => openDrawer()}
+            type="button"
+          >
+            <Icon name="plus" size={15} />
+            Add Shift
+          </button>
+        </div>
+      </div>
+
+      <div className="roster-board">
+        <div className="roster-board-header">
+          <div className="staff-col">Staff · {displayedEmployees.length}</div>
+          {days.map((day) => {
+            const header = formatDayHeader(day);
+            const isToday = sameDay(day, today);
+            return (
+              <div className={isToday ? "day-head today" : "day-head"} key={day.toISOString()}>
+                <span>{header.dow}</span>
+                <strong>{header.day}</strong>
+              </div>
+            );
+          })}
+        </div>
+
+        {displayedEmployees.length ? (
+          displayedEmployees.map((employee, index) => {
+            const employeeShifts = shifts.filter(
+              (shift) => shift.employee_id === employee.id,
+            );
+            return (
+              <div className="roster-row" key={employee.id}>
+                <div className="staff-cell">
+                  <div
+                    className="avatar"
+                    style={{ background: shiftColors[index % shiftColors.length] }}
+                  >
+                    {initials(employee.full_name)}
+                  </div>
+                  <div>
+                    <strong>{employee.full_name}</strong>
+                    <span>{humanize(employee.employment_type)}</span>
+                  </div>
+                </div>
+                {days.map((day) => {
+                  const dayShifts = employeeShifts.filter((shift) =>
+                    sameDay(new Date(shift.starts_at), day),
+                  );
+                  return (
+                    <div
+                      className={sameDay(day, today) ? "shift-cell today" : "shift-cell"}
+                      key={`${employee.id}-${day.toISOString()}`}
+                    >
+                      {dayShifts.length ? (
+                        dayShifts.map((shift) => {
+                          const color = colorForId(shift.location_id ?? shift.id);
+                          return (
+                            <div
+                              className={
+                                shift.status === "draft"
+                                  ? "shift-chip draft"
+                                  : "shift-chip"
+                              }
+                              key={shift.id}
+                              style={{ "--shift-color": color } as CSSProperties}
+                            >
+                              <strong>
+                                {shift.location_id
+                                  ? locationNames.get(shift.location_id) ??
+                                    "Assigned shift"
+                                  : "Assigned shift"}
+                              </strong>
+                              <span>
+                                {formatTime(shift.starts_at)} - {formatTime(shift.ends_at)}
+                              </span>
+                              <div className="shift-actions">
+                                {shift.status === "draft" ? (
+                                  <button
+                                    onClick={() => void onPublish(shift.id)}
+                                    type="button"
+                                  >
+                                    Publish
+                                  </button>
+                                ) : null}
+                                <button
+                                  onClick={() => void onDelete(shift.id)}
+                                  type="button"
+                                >
+                                  Delete
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })
+                      ) : (
                         <button
-                          className="danger-btn"
-                          onClick={() => void onDelete(shift.id)}
+                          className="empty-shift"
+                          onClick={() => openDrawer(employee.id, day)}
                           type="button"
                         >
-                          Delete
+                          <Icon name="plus" size={15} />
                         </button>
-                      </div>
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            );
+          })
         ) : (
-          <div className="empty-state">No shifts yet.</div>
+          <div className="roster-empty">Create employees before building the roster.</div>
         )}
       </div>
-      <div className="card form-card roster-form-card">
-        <h3>Create shift</h3>
-        <form className="form-grid" onSubmit={(event) => void submit(event)}>
-          <label>
-            Employee
-            <select
-              onChange={(event) => update("employee_id", event.target.value)}
-              required
-              value={form.employee_id}
-            >
-              <option value="">Select employee</option>
-              {employees.map((employee) => (
-                <option key={employee.id} value={employee.id}>
-                  {employee.full_name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <label>
-            Location
-            <select
-              onChange={(event) => update("location_id", event.target.value)}
-              value={form.location_id}
-            >
-              <option value="">Unassigned</option>
-              {locations.map((location) => (
-                <option key={location.id} value={location.id}>
-                  {location.name}
-                </option>
-              ))}
-            </select>
-          </label>
-          <div className="form-grid two-col date-time-grid">
-            <label>
-              Starts
-              <input
-                onChange={(event) => update("starts_at", event.target.value)}
-                required
-                type="datetime-local"
-                value={form.starts_at}
-              />
-            </label>
-            <label>
-              Ends
-              <input
-                onChange={(event) => update("ends_at", event.target.value)}
-                required
-                type="datetime-local"
-                value={form.ends_at}
-              />
-            </label>
-          </div>
-          <label className="span-all">
-            Notes
-            <textarea
-              onChange={(event) => update("notes", event.target.value)}
-              value={form.notes}
-            />
-          </label>
-          <button className="primary-btn" disabled={!employees.length} type="submit">
-            Create draft
-          </button>
-        </form>
-      </div>
+
+      {drawerOpen ? (
+        <>
+          <button
+            aria-label="Close create shift drawer"
+            className="drawer-scrim"
+            onClick={() => setDrawerOpen(false)}
+            type="button"
+          />
+          <aside className="shift-drawer">
+            <div className="drawer-head">
+              <h2>Add Shift</h2>
+              <button
+                className="icon-btn"
+                onClick={() => setDrawerOpen(false)}
+                type="button"
+              >
+                <Icon name="x" size={16} />
+              </button>
+            </div>
+            <form className="drawer-body" onSubmit={(event) => void submit(event)}>
+              <label>
+                Staff member
+                <select
+                  onChange={(event) => update("employee_id", event.target.value)}
+                  required
+                  value={form.employee_id}
+                >
+                  <option value="">Select employee</option>
+                  {employees.map((employee) => (
+                    <option key={employee.id} value={employee.id}>
+                      {employee.full_name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Location / assignment
+                <select
+                  onChange={(event) => update("location_id", event.target.value)}
+                  value={form.location_id}
+                >
+                  <option value="">Unassigned</option>
+                  {locations.map((location) => (
+                    <option key={location.id} value={location.id}>
+                      {location.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <div className="form-grid two-col">
+                <label>
+                  Starts
+                  <input
+                    onChange={(event) => update("starts_at", event.target.value)}
+                    required
+                    type="datetime-local"
+                    value={form.starts_at}
+                  />
+                </label>
+                <label>
+                  Ends
+                  <input
+                    onChange={(event) => update("ends_at", event.target.value)}
+                    required
+                    type="datetime-local"
+                    value={form.ends_at}
+                  />
+                </label>
+              </div>
+              <label>
+                Notes
+                <textarea
+                  onChange={(event) => update("notes", event.target.value)}
+                  value={form.notes}
+                />
+              </label>
+              <div className="drawer-note">
+                Draft shifts stay internal until published.
+              </div>
+              <div className="drawer-actions">
+                <button
+                  className="ghost-btn"
+                  onClick={() => setDrawerOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="primary-btn"
+                  disabled={!employees.length}
+                  type="submit"
+                >
+                  <Icon name="plus" size={15} />
+                  Add Draft Shift
+                </button>
+              </div>
+            </form>
+          </aside>
+        </>
+      ) : null}
+
+      {shifts.length ? (
+        <div className="roster-legend">
+          <span>Assignments:</span>
+          {locations.slice(0, 6).map((location) => (
+            <span key={location.id}>
+              <i style={{ background: colorForId(location.id) }} />
+              {location.name}
+            </span>
+          ))}
+          {!locations.length ? <span>No locations created yet</span> : null}
+        </div>
+      ) : null}
     </section>
   );
 }
