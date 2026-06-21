@@ -1,0 +1,72 @@
+version: "2"
+# Two physically separate schemas: the shared control-plane DB and the
+# per-tenant DB. They must never be mixed in one query. Each gets its own
+# generated package under gen/sqlc.
+#
+# The control-plane block activates once M1 adds its first migration + query.
+# Tenant-schema blocks (identity, roster, attendance) are added per module
+# from M2, each with `schema: db/migrations/tenant` and its own out package —
+# preserving module isolation.
+sql:
+  - engine: postgresql
+    schema: db/migrations/controlplane
+    queries: db/queries/controlplane
+    gen:
+      go:
+        package: controlplanedb
+        out: gen/sqlc/controlplane
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+  # Tenant-schema modules. Each module gets its own generated package (module
+  # isolation), all sharing the tenant schema (db/migrations/tenant).
+  - engine: postgresql
+    schema: db/migrations/tenant
+    queries: db/queries/identity
+    gen:
+      go:
+        package: identitydb
+        out: gen/sqlc/identity
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "date"
+            go_type: "time.Time"
+  - engine: postgresql
+    schema: db/migrations/tenant
+    queries: db/queries/roster
+    gen:
+      go:
+        package: rosterdb
+        out: gen/sqlc/roster
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "date"
+            go_type: "time.Time"
+  - engine: postgresql
+    schema: db/migrations/tenant
+    queries: db/queries/attendance
+    gen:
+      go:
+        package: attendancedb
+        out: gen/sqlc/attendance
+        sql_package: pgx/v5
+        emit_pointers_for_null_types: true
+        overrides:
+          - db_type: "uuid"
+            go_type: "github.com/google/uuid.UUID"
+          - db_type: "timestamptz"
+            go_type: "time.Time"
+          - db_type: "date"
+            go_type: "time.Time"

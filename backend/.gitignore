@@ -1,0 +1,15 @@
+# Local environment (never commit secrets)
+.env
+
+# Build artifacts
+/bin/
+*.test
+*.out
+coverage.*
+
+# OS noise
+.DS_Store
+
+# NOTE: gen/ is intentionally NOT ignored. Generated sqlc/oapi code is committed
+# so `go build`, CI, and clients work without running codegen tools. It is
+# regenerated via `make generate` and must never be hand-edited.

@@ -1,0 +1,146 @@
+package attendance
+
+import (
+	"context"
+	"errors"
+	"fmt"
+	"log/slog"
+
+	"github.com/google/uuid"
+
+	appmw "github.com/davidnguyen2205/opero/backend/internal/platform/middleware"
+)
+
+type repo interface {
+	GetByClientID(ctx context.Context, clientID uuid.UUID) (Record, error)
+	CreateCheckIn(ctx context.Context, employeeID uuid.UUID, in CheckInInput) (Record, error)
+	CheckOut(ctx context.Context, in CheckOutInput) (Record, error)
+	List(ctx context.Context, f AttendanceFilter) ([]Record, error)
+	ListByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) ([]Record, error)
+}
+
+// EmployeeResolver maps a control-plane user id to its tenant employee id.
+// Satisfied by identity.Service. The bool is false when the user has no linked
+// employee (kept as a bool rather than a cross-package sentinel error so this
+// module needn't import identity).
+type EmployeeResolver interface {
+	EmployeeIDByUserID(ctx context.Context, userID uuid.UUID) (uuid.UUID, bool, error)
+}
+
+type Service struct {
+	newStore  func(ctx context.Context) (repo, error)
+	employees EmployeeResolver
+	logger    *slog.Logger
+}
+
+func NewService(logger *slog.Logger, employees EmployeeResolver) *Service {
+	s := &Service{logger: logger, employees: employees}
+	s.newStore = s.tenantStore
+	return s
+}
+
+func (s *Service) tenantStore(ctx context.Context) (repo, error) {
+	pool, ok := appmw.TenantPoolFromContext(ctx)
+	if !ok {
+		return nil, ErrNoTenant
+	}
+	return NewStore(pool), nil
+}
+
+// resolveEmployee maps the authenticated user to their tenant employee id.
+func (s *Service) resolveEmployee(ctx context.Context, userID uuid.UUID) (uuid.UUID, error) {
+	empID, found, err := s.employees.EmployeeIDByUserID(ctx, userID)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	if !found {
+		return uuid.Nil, fmt.Errorf("%w: no employee is linked to this account", ErrValidation)
+	}
+	return empID, nil
+}
+
+// CheckIn records (idempotently) a check-in for the authenticated user's
+// employee. Returns created=true only when a new record was inserted.
+func (s *Service) CheckIn(ctx context.Context, userID uuid.UUID, in CheckInInput) (Record, bool, error) {
+	if in.ClientID == uuid.Nil {
+		return Record{}, false, fmt.Errorf("%w: client_id is required", ErrValidation)
+	}
+	empID, err := s.resolveEmployee(ctx, userID)
+	if err != nil {
+		return Record{}, false, err
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return Record{}, false, err
+	}
+
+	existing, err := st.GetByClientID(ctx, in.ClientID)
+	switch {
+	case err == nil:
+		if existing.EmployeeID != empID {
+			return Record{}, false, fmt.Errorf("%w: client_id already used by another employee", ErrConflict)
+		}
+		return existing, false, nil // idempotent replay
+	case !errors.Is(err, ErrNotFound):
+		return Record{}, false, err
+	}
+
+	rec, err := st.CreateCheckIn(ctx, empID, in)
+	if err != nil {
+		// Lost a race with a concurrent identical check-in: fetch and return it.
+		if errors.Is(err, ErrConflict) {
+			if existing, getErr := st.GetByClientID(ctx, in.ClientID); getErr == nil && existing.EmployeeID == empID {
+				return existing, false, nil
+			}
+		}
+		return Record{}, false, err
+	}
+	return rec, true, nil
+}
+
+// CheckOut records check-out against the record identified by client_id. The
+// record must belong to the authenticated user's employee. Idempotent.
+func (s *Service) CheckOut(ctx context.Context, userID uuid.UUID, in CheckOutInput) (Record, error) {
+	if in.ClientID == uuid.Nil {
+		return Record{}, fmt.Errorf("%w: client_id is required", ErrValidation)
+	}
+	empID, err := s.resolveEmployee(ctx, userID)
+	if err != nil {
+		return Record{}, err
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return Record{}, err
+	}
+
+	rec, err := st.GetByClientID(ctx, in.ClientID)
+	if err != nil {
+		return Record{}, err // ErrNotFound
+	}
+	if rec.EmployeeID != empID {
+		// Don't reveal another employee's record.
+		return Record{}, ErrNotFound
+	}
+	if rec.Status == "checked_out" {
+		return rec, nil // idempotent
+	}
+	return st.CheckOut(ctx, in)
+}
+
+func (s *Service) List(ctx context.Context, f AttendanceFilter) ([]Record, error) {
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return st.List(ctx, f)
+}
+
+// ListByShiftIDs returns attendance records linked to any of the given shifts,
+// independent of check-in time (for the live view join).
+func (s *Service) ListByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) ([]Record, error) {
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return st.ListByShiftIDs(ctx, shiftIDs)
+}

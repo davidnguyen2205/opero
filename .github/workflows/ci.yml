@@ -1,0 +1,34 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          # Enable caching after the first `go mod tidy` produces go.sum.
+          cache: false
+
+      - name: gofmt
+        run: test -z "$(gofmt -l .)" || { echo 'Run gofmt -w .'; gofmt -l .; exit 1; }
+
+      - name: go vet
+        run: go vet ./...
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          working-directory: backend
+
+      - name: test
+        run: go test ./...

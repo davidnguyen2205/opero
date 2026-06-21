@@ -1,0 +1,22 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: opero-postgres
+    environment:
+      POSTGRES_USER: opero
+      POSTGRES_PASSWORD: opero
+      # Creates the shared control-plane database on first startup.
+      # Tenant databases are created per tenant at provision time (M1).
+      POSTGRES_DB: opero_control
+    ports:
+      - "5432:5432"
+    volumes:
+      - opero_pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U opero -d opero_control"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  opero_pgdata:

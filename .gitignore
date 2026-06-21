@@ -1,0 +1,10 @@
+# OS / editor junk
+.DS_Store
+*.swp
+.idea/
+.vscode/
+
+# Local Claude Code overrides (team config in .claude/ IS committed)
+.claude/settings.local.json
+
+# Per-area ignores live in backend/.gitignore, web/.gitignore, mobile/.gitignore

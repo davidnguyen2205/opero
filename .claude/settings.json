@@ -1,0 +1,29 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // \"\"' | { read -r f; case \"$f\" in */gen/*) echo '{\"hookSpecificOutput\":{\"hookEventName\":\"PreToolUse\",\"permissionDecision\":\"deny\",\"permissionDecisionReason\":\"This file is under gen/ and is generated (sqlc/oapi-codegen). Do not hand-edit it. Change the source (backend/db/queries/*.sql or api/openapi.yaml) and regenerate instead.\"}}';; *) ;; esac; }",
+            "statusMessage": "Guarding generated code"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "jq -r '.tool_input.file_path // .tool_response.filePath // \"\"' | { read -r f; case \"$f\" in *backend/*.go) gf=\"$(command -v gofmt 2>/dev/null || true)\"; [ -z \"$gf\" ] && [ -x /usr/local/go/bin/gofmt ] && gf=/usr/local/go/bin/gofmt; [ -n \"$gf\" ] && \"$gf\" -w \"$f\";; esac; } 2>/dev/null || true",
+            "statusMessage": "gofmt"
+          }
+        ]
+      }
+    ]
+  }
+}

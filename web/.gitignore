@@ -1,0 +1,11 @@
+node_modules/
+dist/
+.env
+.env.local
+*.local
+
+# Editor / OS
+.DS_Store
+
+# NOTE: src/api/schema.d.ts is generated (npm run gen:api) but committed, so the
+# app type-checks without running codegen first. Regenerate it; never hand-edit.

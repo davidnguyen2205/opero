@@ -1,0 +1,9 @@
+# oapi-codegen config. Invoked as:
+#   oapi-codegen -config oapi-codegen.yaml ../api/openapi.yaml
+# Output is committed under gen/oapi and must never be hand-edited.
+package: oapi
+output: gen/oapi/oapi.gen.go
+generate:
+  models: true
+  chi-server: true
+  embedded-spec: true

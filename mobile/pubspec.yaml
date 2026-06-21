@@ -1,0 +1,29 @@
+name: opero_mobile
+description: Opero field-staff mobile app — shifts + offline-tolerant attendance.
+publish_to: "none"
+version: 0.1.0+1
+
+environment:
+  sdk: ">=3.4.0 <4.0.0"
+  flutter: ">=3.22.0"
+
+# NOTE (unverified): these package versions are best-effort from training
+# knowledge (cutoff Jan 2026). Run `flutter pub get`; if a constraint fails,
+# `flutter pub upgrade --major-versions` and reconcile API changes (esp.
+# geolocator + image_picker, whose APIs shift across majors). See SHIPPING.md.
+dependencies:
+  flutter:
+    sdk: flutter
+  http: ^1.2.0
+  shared_preferences: ^2.2.0
+  geolocator: ^12.0.0
+  image_picker: ^1.1.0
+  uuid: ^4.4.0
+
+dev_dependencies:
+  flutter_lints: ^4.0.0
+  flutter_test:
+    sdk: flutter
+
+flutter:
+  uses-material-design: true

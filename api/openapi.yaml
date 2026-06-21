@@ -1,0 +1,1616 @@
+openapi: 3.0.3
+info:
+  title: Opero API
+  version: 0.1.0
+  description: >
+    Opero people-operations API. This spec is the single source of truth —
+    every operation is defined here before it is implemented. Operational
+    routes like /health are infrastructure and intentionally not part of the
+    contract.
+servers:
+  - url: http://localhost:8080
+    description: Local development
+
+tags:
+  - name: auth
+    description: Authentication and tenant onboarding (control-plane operations).
+  - name: identity
+    description: People and org core — employees and departments (tenant data).
+  - name: roster
+    description: Scheduling — shifts and locations (tenant data).
+  - name: attendance
+    description: Field attendance — check-in/out, offline-tolerant via a client-supplied id (tenant data).
+
+paths:
+  /auth/signup:
+    post:
+      operationId: signup
+      tags: [auth]
+      summary: Sign up a new tenant and its first admin user.
+      description: >
+        Creates a new tenant, provisions its isolated database (schema +
+        seed defaults), and creates the first admin user. Returns an access
+        token for the new admin. This is a control-plane operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SignupRequest'
+      responses:
+        '201':
+          description: Tenant and admin user created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: A tenant with this slug, or admin email, already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /auth/login:
+    post:
+      operationId: login
+      tags: [auth]
+      summary: Log in to a tenant.
+      description: >
+        Authenticates a user within a specific tenant (identified by slug,
+        since email is unique only per tenant) and returns an access token.
+        This is a control-plane operation.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: Authenticated.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /auth/me:
+    get:
+      operationId: getCurrentUser
+      tags: [auth]
+      summary: Get the currently authenticated user.
+      description: >
+        Returns the authenticated user and their tenant, resolved from the
+        bearer token. Requires authentication.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The current user and tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /departments:
+    get:
+      operationId: listDepartments
+      tags: [identity]
+      summary: List departments.
+      description: Returns all departments for the tenant. Org hierarchy is expressed via each department's nullable parent_id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The tenant's departments.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Department'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createDepartment
+      tags: [identity]
+      summary: Create a department.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateDepartmentRequest'
+      responses:
+        '201':
+          description: Department created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /departments/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getDepartment
+      tags: [identity]
+      summary: Get a department by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The department.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateDepartment
+      tags: [identity]
+      summary: Update a department.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateDepartmentRequest'
+      responses:
+        '200':
+          description: Updated department.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Department'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteDepartment
+      tags: [identity]
+      summary: Delete a department.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /employees:
+    get:
+      operationId: listEmployees
+      tags: [identity]
+      summary: List employees.
+      description: Returns the tenant's employees, optionally filtered by department or status.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: department_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, inactive]
+      responses:
+        '200':
+          description: The tenant's employees.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createEmployee
+      tags: [identity]
+      summary: Create an employee.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateEmployeeRequest'
+      responses:
+        '201':
+          description: Employee created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /employees/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getEmployee
+      tags: [identity]
+      summary: Get an employee by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateEmployee
+      tags: [identity]
+      summary: Update an employee.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateEmployeeRequest'
+      responses:
+        '200':
+          description: Updated employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Employee'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteEmployee
+      tags: [identity]
+      summary: Delete an employee.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /roles:
+    get:
+      operationId: listRoles
+      tags: [identity]
+      summary: List roles.
+      description: Returns the tenant's roles. Each role carries a set of permission keys (not yet enforced in v1).
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The tenant's roles.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createRole
+      tags: [identity]
+      summary: Create a role.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateRoleRequest'
+      responses:
+        '201':
+          description: Role created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: A role with this name already exists.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /roles/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getRole
+      tags: [identity]
+      summary: Get a role by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateRole
+      tags: [identity]
+      summary: Update a role.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateRoleRequest'
+      responses:
+        '200':
+          description: Updated role.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Role'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteRole
+      tags: [identity]
+      summary: Delete a role.
+      description: Deletes a role. Employees assigned to it have their role cleared (set to null).
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /locations:
+    get:
+      operationId: listLocations
+      tags: [roster]
+      summary: List locations.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The tenant's locations.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createLocation
+      tags: [roster]
+      summary: Create a location.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLocationRequest'
+      responses:
+        '201':
+          description: Location created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /locations/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getLocation
+      tags: [roster]
+      summary: Get a location by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The location.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateLocation
+      tags: [roster]
+      summary: Update a location.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateLocationRequest'
+      responses:
+        '200':
+          description: Updated location.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Location'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteLocation
+      tags: [roster]
+      summary: Delete a location.
+      description: Deletes a location. Shifts at it have their location cleared (set to null).
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /shifts:
+    get:
+      operationId: listShifts
+      tags: [roster]
+      summary: List shifts.
+      description: >
+        Lists shifts, optionally filtered by employee, status, and a
+        [from, to) window on the shift start time.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employee_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [draft, published]
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on starts_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on starts_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Matching shifts.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shift'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createShift
+      tags: [roster]
+      summary: Create a shift (starts as a draft).
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateShiftRequest'
+      responses:
+        '201':
+          description: Shift created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shift'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /shifts/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getShift
+      tags: [roster]
+      summary: Get a shift by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shift'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateShift
+      tags: [roster]
+      summary: Update a shift.
+      description: Updates shift fields. Status transitions go through the publish endpoint, not here.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateShiftRequest'
+      responses:
+        '200':
+          description: Updated shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shift'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteShift
+      tags: [roster]
+      summary: Delete a shift.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /shifts/{id}/publish:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      operationId: publishShift
+      tags: [roster]
+      summary: Publish a shift.
+      description: Transitions a shift to published, making it visible to the assigned staff. Idempotent.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The published shift.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Shift'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /employees/{id}/login:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      operationId: createEmployeeLogin
+      tags: [identity]
+      summary: Provision a login for an employee.
+      description: >
+        Creates a control-plane user account for the employee and links it
+        (employees.user_id), so the employee can authenticate (e.g. field staff
+        on the mobile app). Fails if the employee already has a login or the
+        email is already taken in this tenant.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLoginRequest'
+      responses:
+        '201':
+          description: Login created and linked to the employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The employee already has a login, or the email is taken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /attendance:
+    get:
+      operationId: listAttendance
+      tags: [attendance]
+      summary: List attendance records.
+      description: Lists attendance records, optionally filtered by employee, status, and a [from, to) window on check-in time.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: employee_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [checked_in, checked_out, missed]
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on check_in_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on check_in_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Matching attendance records.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/AttendanceRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /attendance/check-in:
+    post:
+      operationId: checkIn
+      tags: [attendance]
+      summary: Check in (field staff).
+      description: >
+        Records a check-in for the authenticated employee (resolved from the
+        token). Idempotent on client_id: replaying the same client_id returns
+        the existing record rather than creating a duplicate — this is what
+        makes the offline mobile queue safe to replay.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckInRequest'
+      responses:
+        '200':
+          description: Existing record returned (idempotent replay).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '201':
+          description: Checked in.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '409':
+          description: The client_id is already in use by another employee.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+
+  /attendance/check-out:
+    post:
+      operationId: checkOut
+      tags: [attendance]
+      summary: Check out (field staff).
+      description: >
+        Records check-out against an existing attendance record identified by
+        the same client_id used at check-in. Idempotent.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CheckOutRequest'
+      responses:
+        '200':
+          description: Checked out (or already checked out — idempotent).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /me/shifts:
+    get:
+      operationId: listMyShifts
+      tags: [roster]
+      summary: List the authenticated employee's own shifts.
+      description: >
+        Field-facing: returns shifts for the employee linked to the caller's
+        login (resolved from the token), optionally filtered by status and a
+        [from, to) window on start time. Returns an empty list if the caller has
+        no linked employee record.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [draft, published]
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on starts_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on starts_at (ISO-8601).
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: The caller's shifts, ordered by start time.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Shift'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /live:
+    get:
+      operationId: getLiveView
+      tags: [roster]
+      summary: Manager live view — who is working now.
+      description: >
+        Published shifts whose start time falls in the window, each joined with
+        the employee and their current attendance state. The window defaults to
+        the current UTC day; clients should pass from/to computed in the user's
+        local timezone for correct day boundaries (the server has no tenant
+        timezone). Shifts that started before the window (e.g. overnight) are
+        not included — the filter is on shift start time.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: from
+          in: query
+          required: false
+          description: Inclusive lower bound on shift starts_at (ISO-8601). Defaults to start of the current UTC day.
+          schema:
+            type: string
+            format: date-time
+        - name: to
+          in: query
+          required: false
+          description: Exclusive upper bound on shift starts_at (ISO-8601). Defaults to start of the next UTC day.
+          schema:
+            type: string
+            format: date-time
+      responses:
+        '200':
+          description: Live view entries, ordered by shift start time.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LiveViewEntry'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+
+  responses:
+    BadRequest:
+      description: The request was malformed or failed validation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Unauthorized:
+      description: Authentication failed or is missing.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    NotFound:
+      description: The resource was not found.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+
+  parameters:
+    IdParam:
+      name: id
+      in: path
+      required: true
+      schema:
+        type: string
+        format: uuid
+
+  schemas:
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:
+          type: string
+          description: A stable, machine-readable error code.
+          example: invalid_credentials
+        message:
+          type: string
+          description: A human-readable explanation.
+
+    SignupRequest:
+      type: object
+      required: [company_name, admin_email, admin_password]
+      properties:
+        company_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+          example: Saigon Tours Co.
+        slug:
+          type: string
+          description: >
+            URL/login-friendly tenant identifier. If omitted, derived from the
+            company name. Lowercase letters, digits, and hyphens.
+          pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+          minLength: 2
+          maxLength: 63
+          example: saigon-tours
+        admin_full_name:
+          type: string
+          description: >
+            Optional. Reserved for M2, when it will seed the admin's employee
+            profile in the tenant database. Accepted but not yet persisted.
+          minLength: 1
+          maxLength: 200
+        admin_email:
+          type: string
+          format: email
+          maxLength: 320
+        admin_password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+
+    LoginRequest:
+      type: object
+      required: [tenant_slug, email, password]
+      properties:
+        tenant_slug:
+          type: string
+          example: saigon-tours
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    AuthResponse:
+      type: object
+      required: [token, token_type, expires_at, user, tenant]
+      properties:
+        token:
+          type: string
+          description: JWT access token.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        tenant:
+          $ref: '#/components/schemas/TenantSummary'
+
+    CurrentUserResponse:
+      type: object
+      required: [user, tenant]
+      properties:
+        user:
+          $ref: '#/components/schemas/UserSummary'
+        tenant:
+          $ref: '#/components/schemas/TenantSummary'
+
+    UserSummary:
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, manager, employee]
+        status:
+          type: string
+          enum: [active, disabled]
+
+    TenantSummary:
+      type: object
+      required: [id, name, slug, status, plan]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, provisioning]
+        plan:
+          type: string
+
+    Department:
+      type: object
+      required: [id, name, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateDepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    UpdateDepartmentRequest:
+      type: object
+      description: >
+        PATCH semantics — only provided fields are changed. Fields cannot be
+        cleared back to null via PATCH in v1 (omitting a field and sending null
+        are equivalent).
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        parent_id:
+          type: string
+          format: uuid
+          nullable: true
+
+    Role:
+      type: object
+      required: [id, name, permissions, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          description: Permission keys granted by this role. Stored but not enforced in v1.
+          items:
+            type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateRoleRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+
+    UpdateRoleRequest:
+      type: object
+      description: >
+        PATCH semantics — only provided fields are changed. permissions, when
+        provided, replaces the whole set.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 100
+        description:
+          type: string
+          nullable: true
+        permissions:
+          type: array
+          items:
+            type: string
+
+    Employee:
+      type: object
+      required: [id, full_name, employment_type, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: Links to the control-plane users.id (different database; no FK).
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The employee's assigned role (access-control), if any.
+        full_name:
+          type: string
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        employment_type:
+          type: string
+          enum: [full_time, part_time, freelance, seasonal]
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+        hired_at:
+          type: string
+          format: date
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateEmployeeRequest:
+      type: object
+      required: [full_name, employment_type]
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        employment_type:
+          type: string
+          enum: [full_time, part_time, freelance, seasonal]
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        hired_at:
+          type: string
+          format: date
+          nullable: true
+        user_id:
+          type: string
+          format: uuid
+          nullable: true
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+          description: Optional on create; defaults to active.
+
+    UpdateEmployeeRequest:
+      type: object
+      description: >
+        PATCH semantics — only provided fields are changed. Fields cannot be
+        cleared back to null via PATCH in v1 (omitting a field and sending null
+        are equivalent).
+      properties:
+        full_name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        employment_type:
+          type: string
+          enum: [full_time, part_time, freelance, seasonal]
+        email:
+          type: string
+          format: email
+          nullable: true
+        phone:
+          type: string
+          nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        title:
+          type: string
+          nullable: true
+        hired_at:
+          type: string
+          format: date
+          nullable: true
+        role_id:
+          type: string
+          format: uuid
+          nullable: true
+        status:
+          type: string
+          enum: [active, inactive]
+
+    Location:
+      type: object
+      required: [id, name, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        address:
+          type: string
+          nullable: true
+        lat:
+          type: number
+          format: double
+          nullable: true
+        lng:
+          type: number
+          format: double
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateLocationRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          nullable: true
+        lat:
+          type: number
+          format: double
+          nullable: true
+        lng:
+          type: number
+          format: double
+          nullable: true
+
+    UpdateLocationRequest:
+      type: object
+      description: PATCH semantics — only provided fields are changed; fields cannot be cleared to null in v1.
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 200
+        address:
+          type: string
+          nullable: true
+        lat:
+          type: number
+          format: double
+          nullable: true
+        lng:
+          type: number
+          format: double
+          nullable: true
+
+    Shift:
+      type: object
+      required: [id, employee_id, starts_at, ends_at, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [draft, published]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateShiftRequest:
+      type: object
+      required: [employee_id, starts_at, ends_at]
+      properties:
+        employee_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+
+    UpdateShiftRequest:
+      type: object
+      description: >
+        PATCH semantics — only provided fields are changed; fields cannot be
+        cleared to null in v1. Status transitions go through POST /shifts/{id}/publish.
+      properties:
+        employee_id:
+          type: string
+          format: uuid
+        location_id:
+          type: string
+          format: uuid
+          nullable: true
+        starts_at:
+          type: string
+          format: date-time
+        ends_at:
+          type: string
+          format: date-time
+        notes:
+          type: string
+          nullable: true
+
+    CreateLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+          maxLength: 320
+        password:
+          type: string
+          format: password
+          minLength: 8
+          maxLength: 128
+        role:
+          type: string
+          enum: [admin, manager, employee]
+          description: Defaults to employee when omitted.
+
+    AttendanceRecord:
+      type: object
+      required: [id, employee_id, client_id, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        shift_id:
+          type: string
+          format: uuid
+          nullable: true
+        client_id:
+          type: string
+          format: uuid
+          description: Client-generated id; the idempotency key for check-in/out.
+        check_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        check_in_lat:
+          type: number
+          format: double
+          nullable: true
+        check_in_lng:
+          type: number
+          format: double
+          nullable: true
+        check_in_photo_url:
+          type: string
+          nullable: true
+        check_out_at:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_lat:
+          type: number
+          format: double
+          nullable: true
+        check_out_lng:
+          type: number
+          format: double
+          nullable: true
+        check_out_photo_url:
+          type: string
+          nullable: true
+        status:
+          type: string
+          enum: [checked_in, checked_out, missed]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CheckInRequest:
+      type: object
+      required: [client_id]
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          description: Client-generated idempotency key (stable across offline retries).
+        shift_id:
+          type: string
+          format: uuid
+          nullable: true
+        lat:
+          type: number
+          format: double
+          nullable: true
+        lng:
+          type: number
+          format: double
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+
+    CheckOutRequest:
+      type: object
+      required: [client_id]
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          description: The same client_id used at check-in.
+        lat:
+          type: number
+          format: double
+          nullable: true
+        lng:
+          type: number
+          format: double
+          nullable: true
+        photo_url:
+          type: string
+          nullable: true
+
+    LiveViewEntry:
+      type: object
+      required: [employee_id, employee_name, shift, attendance_status]
+      properties:
+        employee_id:
+          type: string
+          format: uuid
+        employee_name:
+          type: string
+        shift:
+          $ref: '#/components/schemas/Shift'
+        attendance_status:
+          type: string
+          description: >
+            Derived state for this shift: not_checked_in (no attendance record
+            linked), checked_in, or checked_out.
+          enum: [not_checked_in, checked_in, checked_out]
+        check_in_at:
+          type: string
+          format: date-time
+          nullable: true
+        check_out_at:
+          type: string
+          format: date-time
+          nullable: true

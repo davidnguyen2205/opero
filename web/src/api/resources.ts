@@ -1,0 +1,187 @@
+import { api, setAuthToken } from "./client";
+import type { components } from "./schema";
+
+export type AuthResponse = components["schemas"]["AuthResponse"];
+export type CurrentUserResponse = components["schemas"]["CurrentUserResponse"];
+export type Department = components["schemas"]["Department"];
+export type Employee = components["schemas"]["Employee"];
+export type Location = components["schemas"]["Location"];
+export type Role = components["schemas"]["Role"];
+export type Shift = components["schemas"]["Shift"];
+
+export type CreateDepartmentRequest =
+  components["schemas"]["CreateDepartmentRequest"];
+export type CreateEmployeeRequest = components["schemas"]["CreateEmployeeRequest"];
+export type CreateLocationRequest = components["schemas"]["CreateLocationRequest"];
+export type CreateRoleRequest = components["schemas"]["CreateRoleRequest"];
+export type CreateShiftRequest = components["schemas"]["CreateShiftRequest"];
+export type LoginRequest = components["schemas"]["LoginRequest"];
+export type SignupRequest = components["schemas"]["SignupRequest"];
+
+export { setAuthToken };
+
+type ApiResult<T> = {
+  data?: T;
+  error?: unknown;
+  response: Response;
+};
+
+function errorMessage(error: unknown, fallback: string): string {
+  if (typeof error === "object" && error && "message" in error) {
+    const message = (error as { message?: unknown }).message;
+    if (typeof message === "string" && message.trim()) {
+      return message;
+    }
+  }
+  return fallback;
+}
+
+async function unwrap<T>(result: ApiResult<T>, fallback: string): Promise<T> {
+  if (result.error || !result.response.ok) {
+    throw new Error(errorMessage(result.error, fallback));
+  }
+  if (result.data === undefined) {
+    throw new Error(fallback);
+  }
+  return result.data;
+}
+
+async function unwrapEmpty(
+  result: ApiResult<unknown>,
+  fallback: string,
+): Promise<void> {
+  if (result.error || !result.response.ok) {
+    throw new Error(errorMessage(result.error, fallback));
+  }
+}
+
+export const authApi = {
+  async login(body: LoginRequest): Promise<AuthResponse> {
+    return unwrap(
+      await api.POST("/auth/login", { body }),
+      "Unable to log in.",
+    );
+  },
+  async signup(body: SignupRequest): Promise<AuthResponse> {
+    return unwrap(
+      await api.POST("/auth/signup", { body }),
+      "Unable to create tenant.",
+    );
+  },
+  async me(): Promise<CurrentUserResponse> {
+    return unwrap(await api.GET("/auth/me"), "Unable to load current user.");
+  },
+};
+
+export const departmentsApi = {
+  async list(): Promise<Department[]> {
+    return unwrap(
+      await api.GET("/departments"),
+      "Unable to load departments.",
+    );
+  },
+  async create(body: CreateDepartmentRequest): Promise<Department> {
+    return unwrap(
+      await api.POST("/departments", { body }),
+      "Unable to create department.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/departments/{id}", { params: { path: { id } } }),
+      "Unable to delete department.",
+    );
+  },
+};
+
+export const employeesApi = {
+  async list(filters: {
+    department_id?: string;
+    status?: Employee["status"];
+  } = {}): Promise<Employee[]> {
+    return unwrap(
+      await api.GET("/employees", { params: { query: filters } }),
+      "Unable to load employees.",
+    );
+  },
+  async create(body: CreateEmployeeRequest): Promise<Employee> {
+    return unwrap(
+      await api.POST("/employees", { body }),
+      "Unable to create employee.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/employees/{id}", { params: { path: { id } } }),
+      "Unable to delete employee.",
+    );
+  },
+};
+
+export const rolesApi = {
+  async list(): Promise<Role[]> {
+    return unwrap(await api.GET("/roles"), "Unable to load roles.");
+  },
+  async create(body: CreateRoleRequest): Promise<Role> {
+    return unwrap(
+      await api.POST("/roles", { body }),
+      "Unable to create role.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/roles/{id}", { params: { path: { id } } }),
+      "Unable to delete role.",
+    );
+  },
+};
+
+export const locationsApi = {
+  async list(): Promise<Location[]> {
+    return unwrap(await api.GET("/locations"), "Unable to load locations.");
+  },
+  async create(body: CreateLocationRequest): Promise<Location> {
+    return unwrap(
+      await api.POST("/locations", { body }),
+      "Unable to create location.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/locations/{id}", { params: { path: { id } } }),
+      "Unable to delete location.",
+    );
+  },
+};
+
+export const shiftsApi = {
+  async list(filters: {
+    employee_id?: string;
+    status?: Shift["status"];
+    from?: string;
+    to?: string;
+  } = {}): Promise<Shift[]> {
+    return unwrap(
+      await api.GET("/shifts", { params: { query: filters } }),
+      "Unable to load shifts.",
+    );
+  },
+  async create(body: CreateShiftRequest): Promise<Shift> {
+    return unwrap(
+      await api.POST("/shifts", { body }),
+      "Unable to create shift.",
+    );
+  },
+  async publish(id: string): Promise<Shift> {
+    return unwrap(
+      await api.POST("/shifts/{id}/publish", { params: { path: { id } } }),
+      "Unable to publish shift.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/shifts/{id}", { params: { path: { id } } }),
+      "Unable to delete shift.",
+    );
+  },
+};
