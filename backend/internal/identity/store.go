@@ -111,20 +111,30 @@ func roleFromDB(r identitydb.Role) Role {
 }
 
 func empFromDB(e identitydb.Employee) Employee {
+	langs := e.Languages
+	if langs == nil {
+		langs = []string{}
+	}
 	return Employee{
-		ID:             e.ID,
-		UserID:         fromPgUUID(e.UserID),
-		RoleID:         fromPgUUID(e.RoleID),
-		FullName:       e.FullName,
-		Email:          e.Email,
-		Phone:          e.Phone,
-		EmploymentType: e.EmploymentType,
-		DepartmentID:   fromPgUUID(e.DepartmentID),
-		Title:          e.Title,
-		Status:         e.Status,
-		HiredAt:        fromPgDate(e.HiredAt),
-		CreatedAt:      e.CreatedAt,
-		UpdatedAt:      e.UpdatedAt,
+		ID:                    e.ID,
+		UserID:                fromPgUUID(e.UserID),
+		RoleID:                fromPgUUID(e.RoleID),
+		FullName:              e.FullName,
+		Email:                 e.Email,
+		Phone:                 e.Phone,
+		EmploymentType:        e.EmploymentType,
+		DepartmentID:          fromPgUUID(e.DepartmentID),
+		Title:                 e.Title,
+		Status:                e.Status,
+		HiredAt:               fromPgDate(e.HiredAt),
+		Location:              e.Location,
+		Languages:             langs,
+		EmergencyContactName:  e.EmergencyContactName,
+		EmergencyContactPhone: e.EmergencyContactPhone,
+		ReportsTo:             fromPgUUID(e.ReportsTo),
+		EmployeeCode:          e.EmployeeCode,
+		CreatedAt:             e.CreatedAt,
+		UpdatedAt:             e.UpdatedAt,
 	}
 }
 
@@ -195,17 +205,27 @@ func (s *Store) DeleteDepartment(ctx context.Context, id uuid.UUID) error {
 // --- employees ---
 
 func (s *Store) CreateEmployee(ctx context.Context, in CreateEmployeeInput) (Employee, error) {
+	langs := in.Languages
+	if langs == nil {
+		langs = []string{}
+	}
 	e, err := s.q.CreateEmployee(ctx, identitydb.CreateEmployeeParams{
-		UserID:         toPgUUID(in.UserID),
-		FullName:       in.FullName,
-		Email:          in.Email,
-		Phone:          in.Phone,
-		EmploymentType: in.EmploymentType,
-		DepartmentID:   toPgUUID(in.DepartmentID),
-		Title:          in.Title,
-		Status:         in.Status,
-		HiredAt:        toPgDate(in.HiredAt),
-		RoleID:         toPgUUID(in.RoleID),
+		UserID:                toPgUUID(in.UserID),
+		FullName:              in.FullName,
+		Email:                 in.Email,
+		Phone:                 in.Phone,
+		EmploymentType:        in.EmploymentType,
+		DepartmentID:          toPgUUID(in.DepartmentID),
+		Title:                 in.Title,
+		Status:                in.Status,
+		HiredAt:               toPgDate(in.HiredAt),
+		RoleID:                toPgUUID(in.RoleID),
+		Location:              in.Location,
+		Languages:             langs,
+		EmergencyContactName:  in.EmergencyContactName,
+		EmergencyContactPhone: in.EmergencyContactPhone,
+		ReportsTo:             toPgUUID(in.ReportsTo),
+		EmployeeCode:          in.EmployeeCode,
 	})
 	if err != nil {
 		return Employee{}, fmt.Errorf("create employee: %w", mapErr(err))
@@ -257,16 +277,22 @@ func (s *Store) ListEmployees(ctx context.Context, f EmployeeFilter) ([]Employee
 
 func (s *Store) UpdateEmployee(ctx context.Context, id uuid.UUID, in UpdateEmployeeInput) (Employee, error) {
 	e, err := s.q.UpdateEmployee(ctx, identitydb.UpdateEmployeeParams{
-		FullName:       in.FullName,
-		EmploymentType: in.EmploymentType,
-		Email:          in.Email,
-		Phone:          in.Phone,
-		DepartmentID:   toPgUUID(in.DepartmentID),
-		Title:          in.Title,
-		Status:         in.Status,
-		HiredAt:        toPgDate(in.HiredAt),
-		RoleID:         toPgUUID(in.RoleID),
-		ID:             id,
+		FullName:              in.FullName,
+		EmploymentType:        in.EmploymentType,
+		Email:                 in.Email,
+		Phone:                 in.Phone,
+		DepartmentID:          toPgUUID(in.DepartmentID),
+		Title:                 in.Title,
+		Status:                in.Status,
+		HiredAt:               toPgDate(in.HiredAt),
+		RoleID:                toPgUUID(in.RoleID),
+		Location:              in.Location,
+		Languages:             in.Languages,
+		EmergencyContactName:  in.EmergencyContactName,
+		EmergencyContactPhone: in.EmergencyContactPhone,
+		ReportsTo:             toPgUUID(in.ReportsTo),
+		EmployeeCode:          in.EmployeeCode,
+		ID:                    id,
 	})
 	if err != nil {
 		return Employee{}, fmt.Errorf("update employee: %w", mapErr(err))

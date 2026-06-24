@@ -39,19 +39,25 @@ type Department struct {
 }
 
 type Employee struct {
-	ID             uuid.UUID
-	UserID         *uuid.UUID
-	RoleID         *uuid.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         string
-	HiredAt        *time.Time
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID                    uuid.UUID
+	UserID                *uuid.UUID
+	RoleID                *uuid.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                string
+	HiredAt               *time.Time
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
 }
 
 type Role struct {
@@ -104,28 +110,40 @@ var validAccessLevels = map[string]bool{
 }
 
 type CreateEmployeeInput struct {
-	UserID         *uuid.UUID
-	RoleID         *uuid.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         string
-	HiredAt        *time.Time
+	UserID                *uuid.UUID
+	RoleID                *uuid.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                string
+	HiredAt               *time.Time
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
 }
 
 type UpdateEmployeeInput struct {
-	FullName       *string
-	EmploymentType *string
-	Email          *string
-	Phone          *string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         *string
-	HiredAt        *time.Time
-	RoleID         *uuid.UUID
+	FullName              *string
+	EmploymentType        *string
+	Email                 *string
+	Phone                 *string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                *string
+	HiredAt               *time.Time
+	RoleID                *uuid.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
 }
 
 type EmployeeFilter struct {

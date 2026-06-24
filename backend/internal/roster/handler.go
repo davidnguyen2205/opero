@@ -147,6 +147,7 @@ func (h *Handler) CreateShift(w http.ResponseWriter, r *http.Request) {
 	s, err := h.svc.CreateShift(r.Context(), CreateShiftInput{
 		EmployeeID: body.EmployeeId,
 		LocationID: body.LocationId,
+		TourID:     body.TourId,
 		StartsAt:   body.StartsAt,
 		EndsAt:     body.EndsAt,
 		Notes:      body.Notes,
@@ -176,6 +177,7 @@ func (h *Handler) UpdateShift(w http.ResponseWriter, r *http.Request, id oapi.Id
 	s, err := h.svc.UpdateShift(r.Context(), id, UpdateShiftInput{
 		EmployeeID: body.EmployeeId,
 		LocationID: body.LocationId,
+		TourID:     body.TourId,
 		StartsAt:   body.StartsAt,
 		EndsAt:     body.EndsAt,
 		Notes:      body.Notes,
@@ -223,6 +225,7 @@ func toShift(s Shift) oapi.Shift {
 		Id:         s.ID,
 		EmployeeId: s.EmployeeID,
 		LocationId: s.LocationID,
+		TourId:     s.TourID,
 		StartsAt:   s.StartsAt,
 		EndsAt:     s.EndsAt,
 		Notes:      s.Notes,

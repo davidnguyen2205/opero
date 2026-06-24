@@ -1,9 +1,11 @@
 -- name: CreateEmployee :one
 INSERT INTO employees (
     user_id, full_name, email, phone, employment_type,
-    department_id, title, status, hired_at, role_id
+    department_id, title, status, hired_at, role_id,
+    location, languages, emergency_contact_name, emergency_contact_phone,
+    reports_to, employee_code
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
 RETURNING *;
 
 -- name: GetEmployee :one
@@ -34,6 +36,12 @@ UPDATE employees SET
     status          = COALESCE(sqlc.narg('status'), status),
     hired_at        = COALESCE(sqlc.narg('hired_at'), hired_at),
     role_id         = COALESCE(sqlc.narg('role_id'), role_id),
+    location        = COALESCE(sqlc.narg('location'), location),
+    languages       = COALESCE(sqlc.narg('languages'), languages),
+    emergency_contact_name  = COALESCE(sqlc.narg('emergency_contact_name'), emergency_contact_name),
+    emergency_contact_phone = COALESCE(sqlc.narg('emergency_contact_phone'), emergency_contact_phone),
+    reports_to      = COALESCE(sqlc.narg('reports_to'), reports_to),
+    employee_code   = COALESCE(sqlc.narg('employee_code'), employee_code),
     updated_at      = now()
 WHERE id = sqlc.arg('id')
 RETURNING *;

@@ -1099,6 +1099,17 @@ export interface components {
             status: "active" | "inactive";
             /** Format: date */
             hired_at?: string | null;
+            location?: string | null;
+            languages?: string[] | null;
+            emergency_contact_name?: string | null;
+            emergency_contact_phone?: string | null;
+            /**
+             * Format: uuid
+             * @description The employee this person reports to, if set.
+             */
+            reports_to?: string | null;
+            /** @description Human-facing staff ID (e.g. TT-1007). */
+            employee_code?: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -1116,6 +1127,13 @@ export interface components {
             title?: string | null;
             /** Format: date */
             hired_at?: string | null;
+            location?: string | null;
+            languages?: string[] | null;
+            emergency_contact_name?: string | null;
+            emergency_contact_phone?: string | null;
+            /** Format: uuid */
+            reports_to?: string | null;
+            employee_code?: string | null;
             /** Format: uuid */
             user_id?: string | null;
             /** Format: uuid */
@@ -1139,6 +1157,13 @@ export interface components {
             title?: string | null;
             /** Format: date */
             hired_at?: string | null;
+            location?: string | null;
+            languages?: string[] | null;
+            emergency_contact_name?: string | null;
+            emergency_contact_phone?: string | null;
+            /** Format: uuid */
+            reports_to?: string | null;
+            employee_code?: string | null;
             /** Format: uuid */
             role_id?: string | null;
             /** @enum {string} */
@@ -1187,6 +1212,11 @@ export interface components {
             /** Format: date-time */
             ends_at: string;
             notes?: string | null;
+            /**
+             * Format: uuid
+             * @description The tour this shift delivers, if any.
+             */
+            tour_id?: string | null;
             /** @enum {string} */
             status: "draft" | "published";
             /** Format: date-time */
@@ -1204,6 +1234,8 @@ export interface components {
             /** Format: date-time */
             ends_at: string;
             notes?: string | null;
+            /** Format: uuid */
+            tour_id?: string | null;
         };
         /** @description PATCH semantics — only provided fields are changed; fields cannot be cleared to null in v1. Status transitions go through POST /shifts/{id}/publish. */
         UpdateShiftRequest: {
@@ -1216,6 +1248,8 @@ export interface components {
             /** Format: date-time */
             ends_at?: string;
             notes?: string | null;
+            /** Format: uuid */
+            tour_id?: string | null;
         };
         CreateLoginRequest: {
             /** Format: email */

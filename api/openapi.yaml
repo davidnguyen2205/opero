@@ -2116,6 +2116,29 @@ components:
           type: string
           format: date
           nullable: true
+        location:
+          type: string
+          nullable: true
+        languages:
+          type: array
+          nullable: true
+          items:
+            type: string
+        emergency_contact_name:
+          type: string
+          nullable: true
+        emergency_contact_phone:
+          type: string
+          nullable: true
+        reports_to:
+          type: string
+          format: uuid
+          nullable: true
+          description: The employee this person reports to, if set.
+        employee_code:
+          type: string
+          nullable: true
+          description: Human-facing staff ID (e.g. TT-1007).
         created_at:
           type: string
           format: date-time
@@ -2151,6 +2174,27 @@ components:
         hired_at:
           type: string
           format: date
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        languages:
+          type: array
+          nullable: true
+          items:
+            type: string
+        emergency_contact_name:
+          type: string
+          nullable: true
+        emergency_contact_phone:
+          type: string
+          nullable: true
+        reports_to:
+          type: string
+          format: uuid
+          nullable: true
+        employee_code:
+          type: string
           nullable: true
         user_id:
           type: string
@@ -2196,6 +2240,27 @@ components:
         hired_at:
           type: string
           format: date
+          nullable: true
+        location:
+          type: string
+          nullable: true
+        languages:
+          type: array
+          nullable: true
+          items:
+            type: string
+        emergency_contact_name:
+          type: string
+          nullable: true
+        emergency_contact_phone:
+          type: string
+          nullable: true
+        reports_to:
+          type: string
+          format: uuid
+          nullable: true
+        employee_code:
+          type: string
           nullable: true
         role_id:
           type: string
@@ -2295,6 +2360,11 @@ components:
         notes:
           type: string
           nullable: true
+        tour_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The tour this shift delivers, if any.
         status:
           type: string
           enum: [draft, published]
@@ -2325,6 +2395,10 @@ components:
         notes:
           type: string
           nullable: true
+        tour_id:
+          type: string
+          format: uuid
+          nullable: true
 
     UpdateShiftRequest:
       type: object
@@ -2347,6 +2421,10 @@ components:
           format: date-time
         notes:
           type: string
+          nullable: true
+        tour_id:
+          type: string
+          format: uuid
           nullable: true
 
     CreateLoginRequest:

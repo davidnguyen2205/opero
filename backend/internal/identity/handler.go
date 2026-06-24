@@ -128,16 +128,22 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		status = string(*body.Status)
 	}
 	e, err := h.svc.CreateEmployee(r.Context(), CreateEmployeeInput{
-		UserID:         body.UserId,
-		RoleID:         body.RoleId,
-		FullName:       body.FullName,
-		Email:          emailToStr(body.Email),
-		Phone:          body.Phone,
-		EmploymentType: string(body.EmploymentType),
-		DepartmentID:   body.DepartmentId,
-		Title:          body.Title,
-		Status:         status,
-		HiredAt:        dateToTime(body.HiredAt),
+		UserID:                body.UserId,
+		RoleID:                body.RoleId,
+		FullName:              body.FullName,
+		Email:                 emailToStr(body.Email),
+		Phone:                 body.Phone,
+		EmploymentType:        string(body.EmploymentType),
+		DepartmentID:          body.DepartmentId,
+		Title:                 body.Title,
+		Status:                status,
+		HiredAt:               dateToTime(body.HiredAt),
+		Location:              body.Location,
+		Languages:             derefLangs(body.Languages),
+		EmergencyContactName:  body.EmergencyContactName,
+		EmergencyContactPhone: body.EmergencyContactPhone,
+		ReportsTo:             body.ReportsTo,
+		EmployeeCode:          body.EmployeeCode,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -162,15 +168,21 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request, id oapi
 		return
 	}
 	e, err := h.svc.UpdateEmployee(r.Context(), id, UpdateEmployeeInput{
-		FullName:       body.FullName,
-		EmploymentType: enumToStrPtr(body.EmploymentType),
-		Email:          emailToStr(body.Email),
-		Phone:          body.Phone,
-		DepartmentID:   body.DepartmentId,
-		Title:          body.Title,
-		Status:         enumToStrPtr(body.Status),
-		HiredAt:        dateToTime(body.HiredAt),
-		RoleID:         body.RoleId,
+		FullName:              body.FullName,
+		EmploymentType:        enumToStrPtr(body.EmploymentType),
+		Email:                 emailToStr(body.Email),
+		Phone:                 body.Phone,
+		DepartmentID:          body.DepartmentId,
+		Title:                 body.Title,
+		Status:                enumToStrPtr(body.Status),
+		HiredAt:               dateToTime(body.HiredAt),
+		RoleID:                body.RoleId,
+		Location:              body.Location,
+		Languages:             derefLangs(body.Languages),
+		EmergencyContactName:  body.EmergencyContactName,
+		EmergencyContactPhone: body.EmergencyContactPhone,
+		ReportsTo:             body.ReportsTo,
+		EmployeeCode:          body.EmployeeCode,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -321,20 +333,43 @@ func toRole(r Role) oapi.Role {
 
 func toEmployee(e Employee) oapi.Employee {
 	return oapi.Employee{
-		Id:             e.ID,
-		UserId:         e.UserID,
-		RoleId:         e.RoleID,
-		FullName:       e.FullName,
-		Email:          strToEmail(e.Email),
-		Phone:          e.Phone,
-		EmploymentType: oapi.EmployeeEmploymentType(e.EmploymentType),
-		DepartmentId:   e.DepartmentID,
-		Title:          e.Title,
-		Status:         oapi.EmployeeStatus(e.Status),
-		HiredAt:        timeToDate(e.HiredAt),
-		CreatedAt:      e.CreatedAt,
-		UpdatedAt:      e.UpdatedAt,
+		Id:                    e.ID,
+		UserId:                e.UserID,
+		RoleId:                e.RoleID,
+		FullName:              e.FullName,
+		Email:                 strToEmail(e.Email),
+		Phone:                 e.Phone,
+		EmploymentType:        oapi.EmployeeEmploymentType(e.EmploymentType),
+		DepartmentId:          e.DepartmentID,
+		Title:                 e.Title,
+		Status:                oapi.EmployeeStatus(e.Status),
+		HiredAt:               timeToDate(e.HiredAt),
+		Location:              e.Location,
+		Languages:             langsPtr(e.Languages),
+		EmergencyContactName:  e.EmergencyContactName,
+		EmergencyContactPhone: e.EmergencyContactPhone,
+		ReportsTo:             e.ReportsTo,
+		EmployeeCode:          e.EmployeeCode,
+		CreatedAt:             e.CreatedAt,
+		UpdatedAt:             e.UpdatedAt,
 	}
+}
+
+// langsPtr returns nil for an empty slice (so it serialises as omitted), else a pointer.
+func langsPtr(v []string) *[]string {
+	if len(v) == 0 {
+		return nil
+	}
+	return &v
+}
+
+// derefLangs unwraps the optional languages array (nil → nil, meaning "unchanged"
+// on update / empty on create).
+func derefLangs(v *[]string) []string {
+	if v == nil {
+		return nil
+	}
+	return *v
 }
 
 // --- small type converters between generated and domain nullable types ---

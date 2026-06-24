@@ -42,19 +42,25 @@ type Department struct {
 }
 
 type Employee struct {
-	ID             uuid.UUID
-	UserID         pgtype.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   pgtype.UUID
-	Title          *string
-	Status         string
-	HiredAt        pgtype.Date
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	RoleID         pgtype.UUID
+	ID                    uuid.UUID
+	UserID                pgtype.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          pgtype.UUID
+	Title                 *string
+	Status                string
+	HiredAt               pgtype.Date
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	RoleID                pgtype.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             pgtype.UUID
+	EmployeeCode          *string
 }
 
 type LeaveBalance struct {
@@ -111,6 +117,7 @@ type Shift struct {
 	Status     string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	TourID     pgtype.UUID
 }
 
 type Tour struct {

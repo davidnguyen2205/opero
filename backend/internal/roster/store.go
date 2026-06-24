@@ -86,6 +86,7 @@ func shiftFromDB(s rosterdb.Shift) Shift {
 		ID:         s.ID,
 		EmployeeID: s.EmployeeID,
 		LocationID: fromPgUUID(s.LocationID),
+		TourID:     fromPgUUID(s.TourID),
 		StartsAt:   s.StartsAt,
 		EndsAt:     s.EndsAt,
 		Notes:      s.Notes,
@@ -161,6 +162,7 @@ func (s *Store) CreateShift(ctx context.Context, in CreateShiftInput, status str
 	sh, err := s.q.CreateShift(ctx, rosterdb.CreateShiftParams{
 		EmployeeID: in.EmployeeID,
 		LocationID: toPgUUID(in.LocationID),
+		TourID:     toPgUUID(in.TourID),
 		StartsAt:   in.StartsAt,
 		EndsAt:     in.EndsAt,
 		Notes:      in.Notes,
@@ -201,6 +203,7 @@ func (s *Store) UpdateShift(ctx context.Context, id uuid.UUID, in UpdateShiftInp
 	sh, err := s.q.UpdateShift(ctx, rosterdb.UpdateShiftParams{
 		EmployeeID: toPgUUID(in.EmployeeID),
 		LocationID: toPgUUID(in.LocationID),
+		TourID:     toPgUUID(in.TourID),
 		StartsAt:   toPgTimestamptz(in.StartsAt),
 		EndsAt:     toPgTimestamptz(in.EndsAt),
 		Notes:      in.Notes,
