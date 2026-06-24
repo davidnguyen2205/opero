@@ -2,7 +2,11 @@ import 'package:flutter/material.dart';
 
 import '../api/api_client.dart';
 import '../api/auth_store.dart';
+import '../theme.dart';
 
+/// REAL — POST /auth/login. Restyled to the prototype look. Unlike the
+/// prototype mock (email + password only), Opero login requires a tenant slug,
+/// so we keep that field (the API is multi-tenant).
 class LoginScreen extends StatefulWidget {
   final ApiClient api;
   final AuthStore auth;
@@ -35,6 +39,7 @@ class _LoginScreenState extends State<LoginScreen> {
   }
 
   Future<void> _submit() async {
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -45,11 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
         email: _email.text.trim(),
         password: _password.text,
       );
-      await widget.auth.setToken(res.token);
+      await widget.auth.setSession(res);
       if (mounted) widget.onAuthenticated();
     } on ApiException catch (e) {
       setState(() => _error = e.message);
-    } catch (e) {
+    } catch (_) {
       setState(() => _error = 'Could not reach the server. Check your connection.');
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -59,40 +64,88 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Opero — Sign in')),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ListView(
-          children: [
-            TextField(
-              controller: _tenant,
-              decoration: const InputDecoration(labelText: 'Company (tenant slug)'),
-              autocorrect: false,
-            ),
-            TextField(
-              controller: _email,
-              decoration: const InputDecoration(labelText: 'Email'),
-              keyboardType: TextInputType.emailAddress,
-              autocorrect: false,
-            ),
-            TextField(
-              controller: _password,
-              decoration: const InputDecoration(labelText: 'Password'),
-              obscureText: true,
-            ),
-            const SizedBox(height: 16),
-            if (_error != null)
-              Padding(
-                padding: const EdgeInsets.only(bottom: 12),
-                child: Text(_error!, style: const TextStyle(color: Colors.red)),
+      backgroundColor: Colors.white,
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
+              const SizedBox(height: 56),
+              const Center(child: OperoMark(size: 56)),
+              const SizedBox(height: 14),
+              const Center(
+                child: Text('Welcome to Opero',
+                    style: TextStyle(fontSize: 26, fontWeight: FontWeight.w700, color: AppColors.ink)),
               ),
-            FilledButton(
-              onPressed: _busy ? null : _submit,
-              child: _busy
-                  ? const SizedBox(height: 18, width: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('Sign in'),
-            ),
-          ],
+              const SizedBox(height: 4),
+              const Center(
+                child: Text('Sign in to your work account',
+                    style: TextStyle(fontSize: 14, color: AppColors.grey500)),
+              ),
+              const SizedBox(height: 36),
+              _label('Company'),
+              _field(_tenant, hint: 'tenant slug', autofill: false),
+              const SizedBox(height: 16),
+              _label('Work email'),
+              _field(_email, keyboard: TextInputType.emailAddress),
+              const SizedBox(height: 16),
+              _label('Password'),
+              _field(_password, obscure: true),
+              if (_error != null) ...[
+                const SizedBox(height: 14),
+                Text(_error!, style: const TextStyle(color: AppColors.red, fontSize: 13)),
+              ],
+              const SizedBox(height: 24),
+              PhoneButton(
+                label: _busy ? 'Signing in…' : 'Sign In',
+                onPressed: _busy ? null : _submit,
+              ),
+              const SizedBox(height: 24),
+              const Center(
+                child: Text('Need access? Ask your manager to invite you.',
+                    style: TextStyle(fontSize: 12.5, color: AppColors.grey400)),
+              ),
+              const SizedBox(height: 24),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _label(String t) => Padding(
+        padding: const EdgeInsets.only(bottom: 7),
+        child: Text(t,
+            style: const TextStyle(fontSize: 12.5, fontWeight: FontWeight.w600, color: AppColors.grey700)),
+      );
+
+  Widget _field(
+    TextEditingController c, {
+    bool obscure = false,
+    bool autofill = true,
+    String? hint,
+    TextInputType? keyboard,
+  }) {
+    return TextField(
+      controller: c,
+      obscureText: obscure,
+      autocorrect: false,
+      keyboardType: keyboard,
+      style: const TextStyle(fontSize: 15, color: AppColors.grey900),
+      decoration: InputDecoration(
+        hintText: hint,
+        isDense: true,
+        filled: true,
+        fillColor: AppColors.grey50,
+        contentPadding: const EdgeInsets.symmetric(horizontal: 14, vertical: 16),
+        enabledBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.grey200),
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(12),
+          borderSide: const BorderSide(color: AppColors.orange),
         ),
       ),
     );

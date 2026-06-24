@@ -16,6 +16,8 @@ export type CreateEmployeeRequest = components["schemas"]["CreateEmployeeRequest
 export type CreateLocationRequest = components["schemas"]["CreateLocationRequest"];
 export type CreateRoleRequest = components["schemas"]["CreateRoleRequest"];
 export type CreateShiftRequest = components["schemas"]["CreateShiftRequest"];
+export type UpdateEmployeeRequest = components["schemas"]["UpdateEmployeeRequest"];
+export type UpdateShiftRequest = components["schemas"]["UpdateShiftRequest"];
 export type LoginRequest = components["schemas"]["LoginRequest"];
 export type SignupRequest = components["schemas"]["SignupRequest"];
 
@@ -111,6 +113,12 @@ export const employeesApi = {
       "Unable to create employee.",
     );
   },
+  async update(id: string, body: UpdateEmployeeRequest): Promise<Employee> {
+    return unwrap(
+      await api.PATCH("/employees/{id}", { params: { path: { id } }, body }),
+      "Unable to update employee.",
+    );
+  },
   async delete(id: string): Promise<void> {
     await unwrapEmpty(
       await api.DELETE("/employees/{id}", { params: { path: { id } } }),
@@ -171,6 +179,12 @@ export const shiftsApi = {
     return unwrap(
       await api.POST("/shifts", { body }),
       "Unable to create shift.",
+    );
+  },
+  async update(id: string, body: UpdateShiftRequest): Promise<Shift> {
+    return unwrap(
+      await api.PATCH("/shifts/{id}", { params: { path: { id } }, body }),
+      "Unable to update shift.",
     );
   },
   async publish(id: string): Promise<Shift> {

@@ -72,6 +72,15 @@ class ApiClient {
     return list.map((e) => Shift.fromJson(e as Map<String, dynamic>)).toList();
   }
 
+  /// GET /locations — the tenant's locations. Used to resolve a human-readable
+  /// name/address for a shift's location_id (the shift itself has only the id).
+  Future<List<Location>> locations() async {
+    final r = await _http.get(Uri.parse('$apiBaseUrl/locations'), headers: _headers());
+    if (r.statusCode != 200) _raise(r);
+    final list = jsonDecode(r.body) as List<dynamic>;
+    return list.map((e) => Location.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
   /// POST /attendance/check-in. Idempotent on clientId server-side (200 on
   /// replay, 201 on first insert) — both are success here.
   Future<AttendanceRecord> checkIn({
