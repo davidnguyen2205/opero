@@ -14,8 +14,13 @@ import {
   DrawerSectionLabel,
   Field,
   Icon,
+  IconButton,
   PageHeader,
+  SortTh,
+  ViewToggle,
   controlStyle,
+  sortRows,
+  useSort,
 } from "../ui";
 import type { ChipTone } from "../ui";
 
@@ -534,8 +539,17 @@ export function Tours({
   const [cat, setCat] = useState<"all" | TourCategory>("all");
   const [sel, setSel] = useState<Tour | null>(null);
   const [editing, setEditing] = useState<Tour | "new" | null>(null);
+  const [sort, toggleSort] = useSort("name");
 
-  const shown = cat === "all" ? tours : tours.filter((t) => t.category === cat);
+  const filtered = cat === "all" ? tours : tours.filter((t) => t.category === cat);
+  const shown = sortRows(filtered, sort, {
+    name: (t) => t.name,
+    category: (t) => CAT_LABEL[t.category],
+    duration: (t) => t.duration_min,
+    capacity: (t) => t.max_guests,
+    departures: (t) => t.departure_times.length,
+    price: (t) => t.price_cents,
+  });
   const activeCount = tours.filter((t) => t.active).length;
   const cats: ("all" | TourCategory)[] = ["all", ...CATEGORIES.filter((c) => tours.some((t) => t.category === c))];
 
@@ -546,36 +560,7 @@ export function Tours({
         subtitle={`${activeCount} active tour${activeCount === 1 ? "" : "s"} · ${tours.length} total`}
         actions={
           <>
-            <div style={{ display: "inline-flex", background: "var(--adaptive-100)", borderRadius: 7, padding: 3, gap: 2 }}>
-              {(["grid", "list"] as const).map((o) => {
-                const on = o === layout;
-                return (
-                  <button
-                    key={o}
-                    onClick={() => setLayout(o)}
-                    style={{
-                      display: "inline-flex",
-                      alignItems: "center",
-                      gap: 6,
-                      padding: "5px 11px",
-                      borderRadius: 5,
-                      border: 0,
-                      cursor: "pointer",
-                      fontFamily: "inherit",
-                      fontSize: 12.5,
-                      fontWeight: 600,
-                      textTransform: "capitalize",
-                      background: on ? "var(--card)" : "transparent",
-                      color: on ? "var(--adaptive-900)" : "var(--adaptive-500)",
-                      boxShadow: on ? "var(--shadow-xs)" : "none",
-                    }}
-                  >
-                    <Icon name={o === "grid" ? "grid" : "list"} size={15} color={on ? "var(--primary-600)" : "var(--adaptive-400)"} />
-                    {o}
-                  </button>
-                );
-              })}
-            </div>
+            <ViewToggle value={layout} onChange={setLayout} />
             <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
               New Tour
             </Btn>
@@ -630,21 +615,27 @@ export function Tours({
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 760 }}>
               <thead>
-                <tr style={{ background: "var(--adaptive-50)", textAlign: "left" }}>
-                  {["Tour", "Category", "Duration", "Capacity", "Crew", "Departures", "Price", ""].map((h, i) => (
-                    <th
+                <tr>
+                  {(
+                    [
+                      ["Tour", "name"],
+                      ["Category", "category"],
+                      ["Duration", "duration"],
+                      ["Capacity", "capacity"],
+                      ["Crew", null],
+                      ["Departures", "departures"],
+                      ["Price", "price"],
+                      ["", null],
+                    ] as const
+                  ).map(([label, key], i) => (
+                    <SortTh
                       key={i}
-                      style={{
-                        padding: "11px 16px",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: "var(--adaptive-500)",
-                        borderBottom: "1px solid var(--adaptive-200)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
+                      label={label}
+                      sortKey={key}
+                      sort={sort}
+                      onSort={toggleSort}
+                      align={label === "Price" || label === "" ? "right" : "left"}
+                    />
                   ))}
                 </tr>
               </thead>
@@ -673,9 +664,12 @@ export function Tours({
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>{t.max_guests} guests</td>
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>{crewLabel(t)}</td>
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-500)", fontFeatureSettings: "'tnum'" }}>{t.departure_times.join(", ") || "—"}</td>
-                    <td style={{ padding: "11px 16px", fontWeight: 700, color: "var(--adaptive-900)", fontFeatureSettings: "'tnum'" }}>€{euros(t.price_cents)}</td>
+                    <td style={{ padding: "11px 16px", fontWeight: 700, color: "var(--adaptive-900)", fontFeatureSettings: "'tnum'", textAlign: "right" }}>€{euros(t.price_cents)}</td>
                     <td style={{ padding: "11px 16px", textAlign: "right" }}>
-                      <Icon name="chevron" size={15} color="var(--adaptive-300)" />
+                      <div style={{ display: "inline-flex", gap: 6 }}>
+                        <IconButton icon="pencil" title="Edit" onClick={() => setEditing(t)} />
+                        <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(t.id)} />
+                      </div>
                     </td>
                   </tr>
                 ))}

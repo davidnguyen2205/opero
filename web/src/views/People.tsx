@@ -15,9 +15,13 @@ import {
   Drawer,
   Field,
   Icon,
+  IconButton,
   PageHeader,
+  SortTh,
   controlStyle,
   humanize,
+  sortRows,
+  useSort,
 } from "../ui";
 import type { ChipTone } from "../ui";
 
@@ -213,6 +217,7 @@ export function People({
   const [groupByRole, setGroupByRole] = useState(false);
   const [adding, setAdding] = useState(false);
   const [editing, setEditing] = useState<Employee | null>(null);
+  const [sort, toggleSort] = useSort("full_name");
 
   const tabs: { id: string; label: string; count: number }[] = [
     { id: "all", label: "All", count: employees.length },
@@ -227,12 +232,22 @@ export function People({
     tabs.push({ id: "unassigned", label: "Unassigned", count: unassignedCount });
   }
 
-  const shown =
+  const filtered =
     tab === "all"
       ? employees
       : tab === "unassigned"
         ? employees.filter((e) => !e.department_id)
         : employees.filter((e) => e.department_id === tab);
+
+  const sortAccessors: Record<string, (e: Employee) => string | number | null | undefined> = {
+    full_name: (e) => e.full_name,
+    role: (e) => (e.role_id ? roleNames.get(e.role_id) : ""),
+    department: (e) => (e.department_id ? departmentNames.get(e.department_id) : ""),
+    employment_type: (e) => e.employment_type,
+    phone: (e) => e.phone ?? "",
+    status: (e) => e.status,
+  };
+  const shown = sortRows(filtered, sort, sortAccessors);
 
   // When grouping by role, partition the filtered list into role sections
   // (ordered by the roles list; employees without a role go to a final group).
@@ -300,39 +315,9 @@ export function People({
           <Chip tone={s.status === "active" ? "blue" : "neutral"}>{s.status}</Chip>
         </td>
         <td style={{ padding: "10px 16px" }}>
-          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
-            <button
-              onClick={() => setEditing(s)}
-              style={{
-                border: "1px solid var(--adaptive-200)",
-                color: "var(--adaptive-700)",
-                background: "var(--card)",
-                borderRadius: 6,
-                padding: "5px 10px",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Edit
-            </button>
-            <button
-              onClick={() => onDelete(s.id)}
-              style={{
-                border: "1px solid var(--red-200)",
-                color: "var(--red-700)",
-                background: "var(--red-50)",
-                borderRadius: 6,
-                padding: "5px 10px",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-                fontFamily: "inherit",
-              }}
-            >
-              Delete
-            </button>
+          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+            <IconButton icon="pencil" title="Edit" onClick={() => setEditing(s)} />
+            <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(s.id)} />
           </div>
         </td>
       </tr>
@@ -441,21 +426,19 @@ export function People({
         <div style={{ overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 820 }}>
             <thead>
-              <tr style={{ background: "var(--adaptive-50)", textAlign: "left" }}>
-                {["Name", "Role", "Department", "Employment", "Phone", "Status", ""].map((h, i) => (
-                  <th
-                    key={i}
-                    style={{
-                      padding: "11px 16px",
-                      fontWeight: 600,
-                      fontSize: 12,
-                      color: "var(--adaptive-500)",
-                      borderBottom: "1px solid var(--adaptive-200)",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {h}
-                  </th>
+              <tr>
+                {(
+                  [
+                    ["Name", "full_name"],
+                    ["Role", "role"],
+                    ["Department", "department"],
+                    ["Employment", "employment_type"],
+                    ["Phone", "phone"],
+                    ["Status", "status"],
+                    ["", null],
+                  ] as const
+                ).map(([label, key], i) => (
+                  <SortTh key={i} label={label} sortKey={key} sort={sort} onSort={toggleSort} align={key === null ? "right" : "left"} />
                 ))}
               </tr>
             </thead>

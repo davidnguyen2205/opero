@@ -1,6 +1,19 @@
 import { useState } from "react";
 import type { CreateLocationRequest, Location } from "../api/resources";
-import { Btn, Card, Drawer, Field, Icon, PageHeader, colorForId, controlStyle } from "../ui";
+import {
+  Btn,
+  Card,
+  Drawer,
+  Field,
+  Icon,
+  IconButton,
+  PageHeader,
+  SortTh,
+  colorForId,
+  controlStyle,
+  sortRows,
+  useSort,
+} from "../ui";
 
 function AddLocationDrawer({
   onClose,
@@ -86,6 +99,11 @@ export function Locations({
   onDelete: (id: string) => void;
 }) {
   const [adding, setAdding] = useState(false);
+  const [sort, toggleSort] = useSort("name");
+  const sorted = sortRows(locations, sort, {
+    name: (l) => l.name,
+    address: (l) => l.address ?? "",
+  });
 
   return (
     <div style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -110,29 +128,24 @@ export function Locations({
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 680 }}>
               <thead>
-                <tr style={{ background: "var(--adaptive-50)", textAlign: "left" }}>
-                  {["Name", "Address", "Coordinates", ""].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        padding: "11px 16px",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: "var(--adaptive-500)",
-                        borderBottom: "1px solid var(--adaptive-200)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
+                <tr>
+                  {(
+                    [
+                      ["Name", "name"],
+                      ["Address", "address"],
+                      ["Coordinates", null],
+                      ["", null],
+                    ] as const
+                  ).map(([label, key], i) => (
+                    <SortTh key={i} label={label} sortKey={key} sort={sort} onSort={toggleSort} align={key === null && label === "" ? "right" : "left"} />
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {locations.map((loc, i) => (
+                {sorted.map((loc, i) => (
                   <tr
                     key={loc.id}
-                    style={{ borderBottom: i < locations.length - 1 ? "1px solid var(--adaptive-100)" : "none" }}
+                    style={{ borderBottom: i < sorted.length - 1 ? "1px solid var(--adaptive-100)" : "none" }}
                     onMouseEnter={(e) => (e.currentTarget.style.background = "var(--adaptive-50)")}
                     onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
                   >
@@ -160,22 +173,7 @@ export function Locations({
                       {loc.lat != null && loc.lng != null ? `${loc.lat}, ${loc.lng}` : "—"}
                     </td>
                     <td style={{ padding: "10px 16px", textAlign: "right" }}>
-                      <button
-                        onClick={() => onDelete(loc.id)}
-                        style={{
-                          border: "1px solid var(--red-200)",
-                          color: "var(--red-700)",
-                          background: "var(--red-50)",
-                          borderRadius: 6,
-                          padding: "5px 10px",
-                          fontSize: 12,
-                          fontWeight: 600,
-                          cursor: "pointer",
-                          fontFamily: "inherit",
-                        }}
-                      >
-                        Delete
-                      </button>
+                      <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(loc.id)} />
                     </td>
                   </tr>
                 ))}
