@@ -40,6 +40,9 @@ func TestTokenIssueParse(t *testing.T) {
 	if claims.TenantID != tenantID {
 		t.Errorf("TenantID = %v, want %v", claims.TenantID, tenantID)
 	}
+	if claims.Kind != "tenant" {
+		t.Errorf("Kind = %q, want tenant", claims.Kind)
+	}
 	if claims.Role != "admin" {
 		t.Errorf("Role = %q, want admin", claims.Role)
 	}
@@ -49,6 +52,38 @@ func TestTokenIssueParse(t *testing.T) {
 	}
 	if gotUser != userID {
 		t.Errorf("UserID = %v, want %v", gotUser, userID)
+	}
+}
+
+func TestPlatformTokenIssueParse(t *testing.T) {
+	tm := NewTokenManager("a-secret", "opero", time.Hour)
+	platformUserID := uuid.New()
+	now := time.Now()
+
+	tok, exp, err := tm.IssuePlatform(platformUserID, "super_admin", now)
+	if err != nil {
+		t.Fatalf("IssuePlatform: %v", err)
+	}
+	if !exp.After(now) {
+		t.Errorf("expiry %v not after now %v", exp, now)
+	}
+
+	claims, err := tm.Parse(tok)
+	if err != nil {
+		t.Fatalf("Parse: %v", err)
+	}
+	if claims.Kind != "platform" {
+		t.Errorf("Kind = %q, want platform", claims.Kind)
+	}
+	if claims.TenantID != uuid.Nil {
+		t.Errorf("TenantID = %v, want nil", claims.TenantID)
+	}
+	gotUser, err := claims.PlatformUserID()
+	if err != nil {
+		t.Fatalf("PlatformUserID: %v", err)
+	}
+	if gotUser != platformUserID {
+		t.Errorf("PlatformUserID = %v, want %v", gotUser, platformUserID)
 	}
 }
 

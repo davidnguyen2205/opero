@@ -8,9 +8,11 @@ import (
 	"github.com/google/uuid"
 )
 
-// Claims are the custom JWT claims. The subject (sub) is the user id; tenant_id
-// is what TenantMiddleware uses to resolve the tenant's database.
+// Claims are the custom JWT claims. Tenant tokens use subject as the tenant
+// user id and include tenant_id. Platform tokens use subject as the
+// platform_user id and do not select a tenant database.
 type Claims struct {
+	Kind     string    `json:"kind"`
 	TenantID uuid.UUID `json:"tenant_id"`
 	Role     string    `json:"role"`
 	jwt.RegisteredClaims
@@ -18,6 +20,11 @@ type Claims struct {
 
 // UserID returns the token subject parsed as a UUID.
 func (c *Claims) UserID() (uuid.UUID, error) {
+	return uuid.Parse(c.Subject)
+}
+
+// PlatformUserID returns the platform token subject parsed as a UUID.
+func (c *Claims) PlatformUserID() (uuid.UUID, error) {
 	return uuid.Parse(c.Subject)
 }
 
@@ -37,13 +44,24 @@ func NewTokenManager(secret, issuer string, ttl time.Duration) *TokenManager {
 // Issue creates a signed token for the user and returns it with its expiry.
 // now is passed explicitly so callers control the clock (and tests are stable).
 func (m *TokenManager) Issue(userID, tenantID uuid.UUID, role string, now time.Time) (string, time.Time, error) {
+	return m.issue("tenant", userID, tenantID, role, now)
+}
+
+// IssuePlatform creates a signed token for a platform user and returns it with
+// its expiry. Platform tokens never include a tenant id.
+func (m *TokenManager) IssuePlatform(platformUserID uuid.UUID, role string, now time.Time) (string, time.Time, error) {
+	return m.issue("platform", platformUserID, uuid.Nil, role, now)
+}
+
+func (m *TokenManager) issue(kind string, subjectID, tenantID uuid.UUID, role string, now time.Time) (string, time.Time, error) {
 	expiresAt := now.Add(m.ttl)
 	claims := Claims{
+		Kind:     kind,
 		TenantID: tenantID,
 		Role:     role,
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:    m.issuer,
-			Subject:   userID.String(),
+			Subject:   subjectID.String(),
 			IssuedAt:  jwt.NewNumericDate(now),
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 		},

@@ -64,6 +64,216 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/platform/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Log in as an Opero platform user.
+         * @description Authenticates an Opero staff user from the control-plane platform_users table and returns a platform JWT. This token has kind=platform and does not select a tenant database.
+         */
+        post: operations["platformLogin"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/auth/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get the currently authenticated platform user.
+         * @description Returns the Opero staff user represented by the platform JWT.
+         */
+        get: operations["getCurrentPlatformUser"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List tenants.
+         * @description Lists all tenants from the control-plane registry for Super Admin use.
+         */
+        get: operations["platformListTenants"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/tenants/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        /**
+         * Get a tenant.
+         * @description Returns one control-plane tenant registry entry.
+         */
+        get: operations["platformGetTenant"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update tenant platform state.
+         * @description Updates tenant name, status, or plan from the platform console and writes an audit event.
+         */
+        patch: operations["platformUpdateTenant"];
+        trace?: never;
+    };
+    "/platform/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List tenant login users.
+         * @description Lists tenant-scoped login users across the control plane.
+         */
+        get: operations["platformListUsers"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/users/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update a tenant login user.
+         * @description Enables or disables a tenant login user and writes an audit event.
+         */
+        patch: operations["platformUpdateUser"];
+        trace?: never;
+    };
+    "/platform/subscriptions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List subscriptions.
+         * @description Lists subscription stubs across tenants.
+         */
+        get: operations["platformListSubscriptions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/subscriptions/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        /**
+         * Update a subscription.
+         * @description Updates manual subscription plan/status and writes an audit event.
+         */
+        patch: operations["platformUpdateSubscription"];
+        trace?: never;
+    };
+    "/platform/system/health": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get platform health summary.
+         * @description Returns control-plane health and tenant counts for the Super Admin console.
+         */
+        get: operations["platformGetSystemHealth"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/platform/audit-events": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List Super Admin audit events.
+         * @description Lists audited platform actions, newest first.
+         */
+        get: operations["platformListAuditEvents"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/departments": {
         parameters: {
             query?: never;
@@ -644,6 +854,34 @@ export interface components {
             user: components["schemas"]["UserSummary"];
             tenant: components["schemas"]["TenantSummary"];
         };
+        PlatformLoginRequest: {
+            /** Format: email */
+            email: string;
+            /** Format: password */
+            password: string;
+        };
+        PlatformAuthResponse: {
+            /** @description JWT access token with kind=platform. */
+            token: string;
+            /** @enum {string} */
+            token_type: "Bearer";
+            /** Format: date-time */
+            expires_at: string;
+            user: components["schemas"]["PlatformUserSummary"];
+        };
+        CurrentPlatformUserResponse: {
+            user: components["schemas"]["PlatformUserSummary"];
+        };
+        PlatformUserSummary: {
+            /** Format: uuid */
+            id: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "super_admin" | "support" | "ops";
+            /** @enum {string} */
+            status: "active" | "disabled";
+        };
         UserSummary: {
             /** Format: uuid */
             id: string;
@@ -663,12 +901,112 @@ export interface components {
             status: "active" | "suspended" | "provisioning";
             plan: string;
         };
+        PlatformTenant: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            slug: string;
+            db_name: string;
+            /** @enum {string} */
+            status: "active" | "suspended" | "provisioning";
+            plan: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description PATCH semantics — only provided fields change. */
+        PlatformUpdateTenantRequest: {
+            name?: string;
+            /** @enum {string} */
+            status?: "active" | "suspended" | "provisioning";
+            plan?: string;
+        };
+        PlatformTenantUser: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            tenant_name: string;
+            tenant_slug: string;
+            /** Format: email */
+            email: string;
+            /** @enum {string} */
+            role: "admin" | "manager" | "employee";
+            /** @enum {string} */
+            status: "active" | "disabled";
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        PlatformUpdateUserRequest: {
+            /** @enum {string} */
+            status: "active" | "disabled";
+        };
+        PlatformSubscription: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            tenant_id: string;
+            tenant_name: string;
+            tenant_slug: string;
+            plan: string;
+            status: string;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        /** @description PATCH semantics — only provided fields change. */
+        PlatformUpdateSubscriptionRequest: {
+            plan?: string;
+            status?: string;
+        };
+        PlatformSystemHealth: {
+            /** @enum {string} */
+            control_plane: "ok";
+            tenants_by_status: {
+                [key: string]: number;
+            };
+        };
+        SuperAdminAuditEvent: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            actor_platform_user_id: string;
+            /** Format: email */
+            actor_email: string;
+            action: string;
+            target_type: string;
+            /** Format: uuid */
+            target_id?: string | null;
+            /** Format: uuid */
+            tenant_id?: string | null;
+            tenant_name?: string | null;
+            tenant_slug?: string | null;
+            metadata: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            created_at: string;
+        };
         Department: {
             /** Format: uuid */
             id: string;
             name: string;
             /** Format: uuid */
             parent_id?: string | null;
+            description?: string | null;
+            /**
+             * Format: uuid
+             * @description The employee who leads this department, if set.
+             */
+            lead_employee_id?: string | null;
+            /** @description Icon key for UI (e.g. route, briefcase). */
+            icon?: string | null;
+            /** @description Accent colour (hex) for UI. */
+            color?: string | null;
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -678,18 +1016,39 @@ export interface components {
             name: string;
             /** Format: uuid */
             parent_id?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            lead_employee_id?: string | null;
+            icon?: string | null;
+            color?: string | null;
         };
         /** @description PATCH semantics — only provided fields are changed. Fields cannot be cleared back to null via PATCH in v1 (omitting a field and sending null are equivalent). */
         UpdateDepartmentRequest: {
             name?: string;
             /** Format: uuid */
             parent_id?: string | null;
+            description?: string | null;
+            /** Format: uuid */
+            lead_employee_id?: string | null;
+            icon?: string | null;
+            color?: string | null;
         };
+        /**
+         * @description The product surface and privilege a role grants.
+         * @enum {string}
+         */
+        AccessLevel: "mobile" | "web_manager" | "web_admin";
         Role: {
             /** Format: uuid */
             id: string;
             name: string;
             description?: string | null;
+            /**
+             * Format: uuid
+             * @description The department this role belongs to, if set.
+             */
+            department_id?: string | null;
+            access_level: components["schemas"]["AccessLevel"];
             /** @description Permission keys granted by this role. Stored but not enforced in v1. */
             permissions: string[];
             /** Format: date-time */
@@ -700,12 +1059,18 @@ export interface components {
         CreateRoleRequest: {
             name: string;
             description?: string | null;
+            /** Format: uuid */
+            department_id?: string | null;
+            access_level?: components["schemas"]["AccessLevel"];
             permissions?: string[];
         };
         /** @description PATCH semantics — only provided fields are changed. permissions, when provided, replaces the whole set. */
         UpdateRoleRequest: {
             name?: string;
             description?: string | null;
+            /** Format: uuid */
+            department_id?: string | null;
+            access_level?: components["schemas"]["AccessLevel"];
             permissions?: string[];
         };
         Employee: {
@@ -1191,6 +1556,282 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["CurrentUserResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformLogin: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformLoginRequest"];
+            };
+        };
+        responses: {
+            /** @description Authenticated platform user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformAuthResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getCurrentPlatformUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current platform user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["CurrentPlatformUserResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformListTenants: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant registry entries. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformTenant"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformGetTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant registry entry. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformTenant"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    platformUpdateTenant: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUpdateTenantRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated tenant. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformTenant"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    platformListUsers: {
+        parameters: {
+            query?: {
+                tenant_id?: string;
+                role?: "admin" | "manager" | "employee";
+                status?: "active" | "disabled";
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Tenant login users. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformTenantUser"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformUpdateUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUpdateUserRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated tenant login user. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["UserSummary"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    platformListSubscriptions: {
+        parameters: {
+            query?: {
+                tenant_id?: string;
+                plan?: string;
+                status?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Subscriptions. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSubscription"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformUpdateSubscription: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["PlatformUpdateSubscriptionRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated subscription. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSubscription"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    platformGetSystemHealth: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Platform health summary. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["PlatformSystemHealth"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    platformListAuditEvents: {
+        parameters: {
+            query?: {
+                tenant_id?: string;
+                actor_platform_user_id?: string;
+                action?: string;
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Audit events. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SuperAdminAuditEvent"][];
                 };
             };
             401: components["responses"]["Unauthorized"];

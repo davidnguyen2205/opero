@@ -9,6 +9,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createUser = `-- name: CreateUser :one
@@ -88,6 +89,105 @@ type GetUserByTenantAndEmailParams struct {
 
 func (q *Queries) GetUserByTenantAndEmail(ctx context.Context, arg GetUserByTenantAndEmailParams) (User, error) {
 	row := q.db.QueryRow(ctx, getUserByTenantAndEmail, arg.TenantID, arg.Lower)
+	var i User
+	err := row.Scan(
+		&i.ID,
+		&i.TenantID,
+		&i.Email,
+		&i.PasswordHash,
+		&i.Role,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const listUsersPlatform = `-- name: ListUsersPlatform :many
+SELECT
+    users.id,
+    users.tenant_id,
+    users.email,
+    users.password_hash,
+    users.role,
+    users.status,
+    users.created_at,
+    users.updated_at,
+    tenants.name AS tenant_name,
+    tenants.slug AS tenant_slug
+FROM users
+JOIN tenants ON tenants.id = users.tenant_id
+WHERE
+    ($1::uuid IS NULL OR users.tenant_id = $1) AND
+    ($2::text IS NULL OR users.status = $2) AND
+    ($3::text IS NULL OR users.role = $3)
+ORDER BY users.created_at DESC
+`
+
+type ListUsersPlatformParams struct {
+	TenantID pgtype.UUID
+	Status   *string
+	Role     *string
+}
+
+type ListUsersPlatformRow struct {
+	ID           uuid.UUID
+	TenantID     uuid.UUID
+	Email        string
+	PasswordHash string
+	Role         string
+	Status       string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+	TenantName   string
+	TenantSlug   string
+}
+
+func (q *Queries) ListUsersPlatform(ctx context.Context, arg ListUsersPlatformParams) ([]ListUsersPlatformRow, error) {
+	rows, err := q.db.Query(ctx, listUsersPlatform, arg.TenantID, arg.Status, arg.Role)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []ListUsersPlatformRow
+	for rows.Next() {
+		var i ListUsersPlatformRow
+		if err := rows.Scan(
+			&i.ID,
+			&i.TenantID,
+			&i.Email,
+			&i.PasswordHash,
+			&i.Role,
+			&i.Status,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.TenantName,
+			&i.TenantSlug,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const updateUserStatusPlatform = `-- name: UpdateUserStatusPlatform :one
+UPDATE users
+SET status = $2
+WHERE id = $1
+RETURNING id, tenant_id, email, password_hash, role, status, created_at, updated_at
+`
+
+type UpdateUserStatusPlatformParams struct {
+	ID     uuid.UUID
+	Status string
+}
+
+func (q *Queries) UpdateUserStatusPlatform(ctx context.Context, arg UpdateUserStatusPlatformParams) (User, error) {
+	row := q.db.QueryRow(ctx, updateUserStatusPlatform, arg.ID, arg.Status)
 	var i User
 	err := row.Scan(
 		&i.ID,

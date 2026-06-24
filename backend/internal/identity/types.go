@@ -27,11 +27,15 @@ var (
 // sqlc and API types at the store and handler boundaries respectively.
 
 type Department struct {
-	ID        uuid.UUID
-	Name      string
-	ParentID  *uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             uuid.UUID
+	Name           string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 type Employee struct {
@@ -51,34 +55,52 @@ type Employee struct {
 }
 
 type Role struct {
-	ID          uuid.UUID
-	Name        string
-	Description *string
-	Permissions []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	Name         string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  string
+	Permissions  []string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type CreateRoleInput struct {
-	Name        string
-	Description *string
-	Permissions []string
+	Name         string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  string
+	Permissions  []string
 }
 
 type UpdateRoleInput struct {
-	Name        *string
-	Description *string
-	Permissions []string
+	Name         *string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  *string
+	Permissions  []string
 }
 
 type CreateDepartmentInput struct {
-	Name     string
-	ParentID *uuid.UUID
+	Name           string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
 }
 
 type UpdateDepartmentInput struct {
-	Name     *string
-	ParentID *uuid.UUID
+	Name           *string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
+}
+
+var validAccessLevels = map[string]bool{
+	"mobile": true, "web_manager": true, "web_admin": true,
 }
 
 type CreateEmployeeInput struct {

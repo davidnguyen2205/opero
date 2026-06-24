@@ -14,6 +14,8 @@ servers:
 tags:
   - name: auth
     description: Authentication and tenant onboarding (control-plane operations).
+  - name: platform
+    description: Super Admin control-plane operations for Opero staff.
   - name: identity
     description: People and org core — employees and departments (tenant data).
   - name: roster
@@ -101,6 +103,319 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/CurrentUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/auth/login:
+    post:
+      operationId: platformLogin
+      tags: [platform]
+      summary: Log in as an Opero platform user.
+      description: >
+        Authenticates an Opero staff user from the control-plane platform_users
+        table and returns a platform JWT. This token has kind=platform and does
+        not select a tenant database.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformLoginRequest'
+      responses:
+        '200':
+          description: Authenticated platform user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformAuthResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/auth/me:
+    get:
+      operationId: getCurrentPlatformUser
+      tags: [platform]
+      summary: Get the currently authenticated platform user.
+      description: Returns the Opero staff user represented by the platform JWT.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The current platform user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CurrentPlatformUserResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/tenants:
+    get:
+      operationId: platformListTenants
+      tags: [platform]
+      summary: List tenants.
+      description: Lists all tenants from the control-plane registry for Super Admin use.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tenant registry entries.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlatformTenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/tenants/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: platformGetTenant
+      tags: [platform]
+      summary: Get a tenant.
+      description: Returns one control-plane tenant registry entry.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Tenant registry entry.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformTenant'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: platformUpdateTenant
+      tags: [platform]
+      summary: Update tenant platform state.
+      description: Updates tenant name, status, or plan from the platform console and writes an audit event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformUpdateTenantRequest'
+      responses:
+        '200':
+          description: Updated tenant.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformTenant'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/users:
+    get:
+      operationId: platformListUsers
+      tags: [platform]
+      summary: List tenant login users.
+      description: Lists tenant-scoped login users across the control plane.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: role
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [admin, manager, employee]
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+            enum: [active, disabled]
+      responses:
+        '200':
+          description: Tenant login users.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlatformTenantUser'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/users/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      operationId: platformUpdateUser
+      tags: [platform]
+      summary: Update a tenant login user.
+      description: Enables or disables a tenant login user and writes an audit event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformUpdateUserRequest'
+      responses:
+        '200':
+          description: Updated tenant login user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/UserSummary'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/subscriptions:
+    get:
+      operationId: platformListSubscriptions
+      tags: [platform]
+      summary: List subscriptions.
+      description: Lists subscription stubs across tenants.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: plan
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: status
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Subscriptions.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/PlatformSubscription'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/subscriptions/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    patch:
+      operationId: platformUpdateSubscription
+      tags: [platform]
+      summary: Update a subscription.
+      description: Updates manual subscription plan/status and writes an audit event.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/PlatformUpdateSubscriptionRequest'
+      responses:
+        '200':
+          description: Updated subscription.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSubscription'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /platform/system/health:
+    get:
+      operationId: platformGetSystemHealth
+      tags: [platform]
+      summary: Get platform health summary.
+      description: Returns control-plane health and tenant counts for the Super Admin console.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Platform health summary.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/PlatformSystemHealth'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /platform/audit-events:
+    get:
+      operationId: platformListAuditEvents
+      tags: [platform]
+      summary: List Super Admin audit events.
+      description: Lists audited platform actions, newest first.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: tenant_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: actor_platform_user_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+        - name: action
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          required: false
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 200
+            default: 100
+      responses:
+        '200':
+          description: Audit events.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SuperAdminAuditEvent'
         '401':
           $ref: '#/components/responses/Unauthorized'
 
@@ -1341,6 +1656,57 @@ components:
         tenant:
           $ref: '#/components/schemas/TenantSummary'
 
+    PlatformLoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          format: email
+        password:
+          type: string
+          format: password
+
+    PlatformAuthResponse:
+      type: object
+      required: [token, token_type, expires_at, user]
+      properties:
+        token:
+          type: string
+          description: JWT access token with kind=platform.
+        token_type:
+          type: string
+          enum: [Bearer]
+        expires_at:
+          type: string
+          format: date-time
+        user:
+          $ref: '#/components/schemas/PlatformUserSummary'
+
+    CurrentPlatformUserResponse:
+      type: object
+      required: [user]
+      properties:
+        user:
+          $ref: '#/components/schemas/PlatformUserSummary'
+
+    PlatformUserSummary:
+      type: object
+      required: [id, email, role, status]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [super_admin, support, ops]
+        status:
+          type: string
+          enum: [active, disabled]
+
     UserSummary:
       type: object
       required: [id, email, role, status]
@@ -1375,6 +1741,165 @@ components:
         plan:
           type: string
 
+    PlatformTenant:
+      type: object
+      required: [id, name, slug, db_name, status, plan, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        slug:
+          type: string
+        db_name:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, provisioning]
+        plan:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PlatformUpdateTenantRequest:
+      type: object
+      description: PATCH semantics — only provided fields change.
+      properties:
+        name:
+          type: string
+        status:
+          type: string
+          enum: [active, suspended, provisioning]
+        plan:
+          type: string
+
+    PlatformTenantUser:
+      type: object
+      required: [id, tenant_id, tenant_name, tenant_slug, email, role, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        tenant_name:
+          type: string
+        tenant_slug:
+          type: string
+        email:
+          type: string
+          format: email
+        role:
+          type: string
+          enum: [admin, manager, employee]
+        status:
+          type: string
+          enum: [active, disabled]
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PlatformUpdateUserRequest:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [active, disabled]
+
+    PlatformSubscription:
+      type: object
+      required: [id, tenant_id, tenant_name, tenant_slug, plan, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        tenant_id:
+          type: string
+          format: uuid
+        tenant_name:
+          type: string
+        tenant_slug:
+          type: string
+        plan:
+          type: string
+        status:
+          type: string
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    PlatformUpdateSubscriptionRequest:
+      type: object
+      description: PATCH semantics — only provided fields change.
+      properties:
+        plan:
+          type: string
+        status:
+          type: string
+
+    PlatformSystemHealth:
+      type: object
+      required: [control_plane, tenants_by_status]
+      properties:
+        control_plane:
+          type: string
+          enum: [ok]
+        tenants_by_status:
+          type: object
+          additionalProperties:
+            type: integer
+
+    SuperAdminAuditEvent:
+      type: object
+      required: [id, actor_platform_user_id, actor_email, action, target_type, metadata, created_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        actor_platform_user_id:
+          type: string
+          format: uuid
+        actor_email:
+          type: string
+          format: email
+        action:
+          type: string
+        target_type:
+          type: string
+        target_id:
+          type: string
+          format: uuid
+          nullable: true
+        tenant_id:
+          type: string
+          format: uuid
+          nullable: true
+        tenant_name:
+          type: string
+          nullable: true
+        tenant_slug:
+          type: string
+          nullable: true
+        metadata:
+          type: object
+          additionalProperties: true
+        created_at:
+          type: string
+          format: date-time
+
     Department:
       type: object
       required: [id, name, created_at, updated_at]
@@ -1388,6 +1913,22 @@ components:
           type: string
           format: uuid
           nullable: true
+        description:
+          type: string
+          nullable: true
+        lead_employee_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The employee who leads this department, if set.
+        icon:
+          type: string
+          nullable: true
+          description: Icon key for UI (e.g. route, briefcase).
+        color:
+          type: string
+          nullable: true
+          description: Accent colour (hex) for UI.
         created_at:
           type: string
           format: date-time
@@ -1407,6 +1948,19 @@ components:
           type: string
           format: uuid
           nullable: true
+        description:
+          type: string
+          nullable: true
+        lead_employee_id:
+          type: string
+          format: uuid
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
 
     UpdateDepartmentRequest:
       type: object
@@ -1423,10 +1977,28 @@ components:
           type: string
           format: uuid
           nullable: true
+        description:
+          type: string
+          nullable: true
+        lead_employee_id:
+          type: string
+          format: uuid
+          nullable: true
+        icon:
+          type: string
+          nullable: true
+        color:
+          type: string
+          nullable: true
+
+    AccessLevel:
+      type: string
+      description: The product surface and privilege a role grants.
+      enum: [mobile, web_manager, web_admin]
 
     Role:
       type: object
-      required: [id, name, permissions, created_at, updated_at]
+      required: [id, name, access_level, permissions, created_at, updated_at]
       properties:
         id:
           type: string
@@ -1436,6 +2008,13 @@ components:
         description:
           type: string
           nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+          description: The department this role belongs to, if set.
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
         permissions:
           type: array
           description: Permission keys granted by this role. Stored but not enforced in v1.
@@ -1459,6 +2038,12 @@ components:
         description:
           type: string
           nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
         permissions:
           type: array
           items:
@@ -1477,6 +2062,12 @@ components:
         description:
           type: string
           nullable: true
+        department_id:
+          type: string
+          format: uuid
+          nullable: true
+        access_level:
+          $ref: '#/components/schemas/AccessLevel'
         permissions:
           type: array
           items:

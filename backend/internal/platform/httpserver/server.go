@@ -79,7 +79,8 @@ func paramErrorHandler(w http.ResponseWriter, _ *http.Request, err error) {
 // BearerAuthScopes in context for those. A route gets TenantMiddleware iff its
 // path matches one of Deps.TenantRoutePrefixes (see that field's doc).
 func securedChain(d Deps) oapi.MiddlewareFunc {
-	authn := appmw.Authenticator(d.Tokens, d.Logger)
+	tenantAuthn := appmw.TenantAuthenticator(d.Tokens, d.Logger)
+	platformAuthn := appmw.PlatformAuthenticator(d.Tokens, d.Logger)
 	tenant := appmw.TenantResolver(d.TenantRegistry, d.TenantPools, d.Logger)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -88,6 +89,10 @@ func securedChain(d Deps) oapi.MiddlewareFunc {
 				return
 			}
 			h := next
+			authn := tenantAuthn
+			if strings.HasPrefix(r.URL.Path, "/platform/") {
+				authn = platformAuthn
+			}
 			if isTenantRoute(d.TenantRoutePrefixes, r.URL.Path) {
 				h = tenant(h)
 			}

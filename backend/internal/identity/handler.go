@@ -47,8 +47,12 @@ func (h *Handler) CreateDepartment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := h.svc.CreateDepartment(r.Context(), CreateDepartmentInput{
-		Name:     body.Name,
-		ParentID: body.ParentId,
+		Name:           body.Name,
+		ParentID:       body.ParentId,
+		Description:    body.Description,
+		LeadEmployeeID: body.LeadEmployeeId,
+		Icon:           body.Icon,
+		Color:          body.Color,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -73,8 +77,12 @@ func (h *Handler) UpdateDepartment(w http.ResponseWriter, r *http.Request, id oa
 		return
 	}
 	d, err := h.svc.UpdateDepartment(r.Context(), id, UpdateDepartmentInput{
-		Name:     body.Name,
-		ParentID: body.ParentId,
+		Name:           body.Name,
+		ParentID:       body.ParentId,
+		Description:    body.Description,
+		LeadEmployeeID: body.LeadEmployeeId,
+		Icon:           body.Icon,
+		Color:          body.Color,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -200,9 +208,12 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
-	in := CreateRoleInput{Name: body.Name, Description: body.Description}
+	in := CreateRoleInput{Name: body.Name, Description: body.Description, DepartmentID: body.DepartmentId}
 	if body.Permissions != nil {
 		in.Permissions = *body.Permissions
+	}
+	if body.AccessLevel != nil {
+		in.AccessLevel = string(*body.AccessLevel)
 	}
 	role, err := h.svc.CreateRole(r.Context(), in)
 	if err != nil {
@@ -227,9 +238,13 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request, id oapi.IdP
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
-	in := UpdateRoleInput{Name: body.Name, Description: body.Description}
+	in := UpdateRoleInput{Name: body.Name, Description: body.Description, DepartmentID: body.DepartmentId}
 	if body.Permissions != nil {
 		in.Permissions = *body.Permissions
+	}
+	if body.AccessLevel != nil {
+		access := string(*body.AccessLevel)
+		in.AccessLevel = &access
 	}
 	role, err := h.svc.UpdateRole(r.Context(), id, in)
 	if err != nil {
@@ -279,22 +294,28 @@ func (h *Handler) CreateEmployeeLogin(w http.ResponseWriter, r *http.Request, id
 
 func toDepartment(d Department) oapi.Department {
 	return oapi.Department{
-		Id:        d.ID,
-		Name:      d.Name,
-		ParentId:  d.ParentID,
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
+		Id:             d.ID,
+		Name:           d.Name,
+		ParentId:       d.ParentID,
+		Description:    d.Description,
+		LeadEmployeeId: d.LeadEmployeeID,
+		Icon:           d.Icon,
+		Color:          d.Color,
+		CreatedAt:      d.CreatedAt,
+		UpdatedAt:      d.UpdatedAt,
 	}
 }
 
 func toRole(r Role) oapi.Role {
 	return oapi.Role{
-		Id:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Permissions: r.Permissions,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		Id:           r.ID,
+		Name:         r.Name,
+		Description:  r.Description,
+		DepartmentId: r.DepartmentID,
+		AccessLevel:  oapi.AccessLevel(r.AccessLevel),
+		Permissions:  r.Permissions,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
 	}
 }
 

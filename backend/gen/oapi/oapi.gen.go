@@ -26,6 +26,27 @@ const (
 	BearerAuthScopes bearerAuthContextKey = "bearerAuth.Scopes"
 )
 
+// Defines values for AccessLevel.
+const (
+	Mobile     AccessLevel = "mobile"
+	WebAdmin   AccessLevel = "web_admin"
+	WebManager AccessLevel = "web_manager"
+)
+
+// Valid indicates whether the value is a known member of the AccessLevel enum.
+func (e AccessLevel) Valid() bool {
+	switch e {
+	case Mobile:
+		return true
+	case WebAdmin:
+		return true
+	case WebManager:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for AttendanceRecordStatus.
 const (
 	AttendanceRecordStatusCheckedIn  AttendanceRecordStatus = "checked_in"
@@ -49,13 +70,13 @@ func (e AttendanceRecordStatus) Valid() bool {
 
 // Defines values for AuthResponseTokenType.
 const (
-	Bearer AuthResponseTokenType = "Bearer"
+	AuthResponseTokenTypeBearer AuthResponseTokenType = "Bearer"
 )
 
 // Valid indicates whether the value is a known member of the AuthResponseTokenType enum.
 func (e AuthResponseTokenType) Valid() bool {
 	switch e {
-	case Bearer:
+	case AuthResponseTokenTypeBearer:
 		return true
 	default:
 		return false
@@ -224,6 +245,174 @@ func (e LiveViewEntryAttendanceStatus) Valid() bool {
 	case LiveViewEntryAttendanceStatusCheckedOut:
 		return true
 	case LiveViewEntryAttendanceStatusNotCheckedIn:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformAuthResponseTokenType.
+const (
+	PlatformAuthResponseTokenTypeBearer PlatformAuthResponseTokenType = "Bearer"
+)
+
+// Valid indicates whether the value is a known member of the PlatformAuthResponseTokenType enum.
+func (e PlatformAuthResponseTokenType) Valid() bool {
+	switch e {
+	case PlatformAuthResponseTokenTypeBearer:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformSystemHealthControlPlane.
+const (
+	Ok PlatformSystemHealthControlPlane = "ok"
+)
+
+// Valid indicates whether the value is a known member of the PlatformSystemHealthControlPlane enum.
+func (e PlatformSystemHealthControlPlane) Valid() bool {
+	switch e {
+	case Ok:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformTenantStatus.
+const (
+	PlatformTenantStatusActive       PlatformTenantStatus = "active"
+	PlatformTenantStatusProvisioning PlatformTenantStatus = "provisioning"
+	PlatformTenantStatusSuspended    PlatformTenantStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the PlatformTenantStatus enum.
+func (e PlatformTenantStatus) Valid() bool {
+	switch e {
+	case PlatformTenantStatusActive:
+		return true
+	case PlatformTenantStatusProvisioning:
+		return true
+	case PlatformTenantStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformTenantUserRole.
+const (
+	PlatformTenantUserRoleAdmin    PlatformTenantUserRole = "admin"
+	PlatformTenantUserRoleEmployee PlatformTenantUserRole = "employee"
+	PlatformTenantUserRoleManager  PlatformTenantUserRole = "manager"
+)
+
+// Valid indicates whether the value is a known member of the PlatformTenantUserRole enum.
+func (e PlatformTenantUserRole) Valid() bool {
+	switch e {
+	case PlatformTenantUserRoleAdmin:
+		return true
+	case PlatformTenantUserRoleEmployee:
+		return true
+	case PlatformTenantUserRoleManager:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformTenantUserStatus.
+const (
+	PlatformTenantUserStatusActive   PlatformTenantUserStatus = "active"
+	PlatformTenantUserStatusDisabled PlatformTenantUserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PlatformTenantUserStatus enum.
+func (e PlatformTenantUserStatus) Valid() bool {
+	switch e {
+	case PlatformTenantUserStatusActive:
+		return true
+	case PlatformTenantUserStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformUpdateTenantRequestStatus.
+const (
+	PlatformUpdateTenantRequestStatusActive       PlatformUpdateTenantRequestStatus = "active"
+	PlatformUpdateTenantRequestStatusProvisioning PlatformUpdateTenantRequestStatus = "provisioning"
+	PlatformUpdateTenantRequestStatusSuspended    PlatformUpdateTenantRequestStatus = "suspended"
+)
+
+// Valid indicates whether the value is a known member of the PlatformUpdateTenantRequestStatus enum.
+func (e PlatformUpdateTenantRequestStatus) Valid() bool {
+	switch e {
+	case PlatformUpdateTenantRequestStatusActive:
+		return true
+	case PlatformUpdateTenantRequestStatusProvisioning:
+		return true
+	case PlatformUpdateTenantRequestStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformUpdateUserRequestStatus.
+const (
+	PlatformUpdateUserRequestStatusActive   PlatformUpdateUserRequestStatus = "active"
+	PlatformUpdateUserRequestStatusDisabled PlatformUpdateUserRequestStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PlatformUpdateUserRequestStatus enum.
+func (e PlatformUpdateUserRequestStatus) Valid() bool {
+	switch e {
+	case PlatformUpdateUserRequestStatusActive:
+		return true
+	case PlatformUpdateUserRequestStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformUserSummaryRole.
+const (
+	Ops        PlatformUserSummaryRole = "ops"
+	SuperAdmin PlatformUserSummaryRole = "super_admin"
+	Support    PlatformUserSummaryRole = "support"
+)
+
+// Valid indicates whether the value is a known member of the PlatformUserSummaryRole enum.
+func (e PlatformUserSummaryRole) Valid() bool {
+	switch e {
+	case Ops:
+		return true
+	case SuperAdmin:
+		return true
+	case Support:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformUserSummaryStatus.
+const (
+	PlatformUserSummaryStatusActive   PlatformUserSummaryStatus = "active"
+	PlatformUserSummaryStatusDisabled PlatformUserSummaryStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PlatformUserSummaryStatus enum.
+func (e PlatformUserSummaryStatus) Valid() bool {
+	switch e {
+	case PlatformUserSummaryStatusActive:
+		return true
+	case PlatformUserSummaryStatusDisabled:
 		return true
 	default:
 		return false
@@ -434,6 +623,45 @@ func (e ListMyShiftsParamsStatus) Valid() bool {
 	}
 }
 
+// Defines values for PlatformListUsersParamsRole.
+const (
+	PlatformListUsersParamsRoleAdmin    PlatformListUsersParamsRole = "admin"
+	PlatformListUsersParamsRoleEmployee PlatformListUsersParamsRole = "employee"
+	PlatformListUsersParamsRoleManager  PlatformListUsersParamsRole = "manager"
+)
+
+// Valid indicates whether the value is a known member of the PlatformListUsersParamsRole enum.
+func (e PlatformListUsersParamsRole) Valid() bool {
+	switch e {
+	case PlatformListUsersParamsRoleAdmin:
+		return true
+	case PlatformListUsersParamsRoleEmployee:
+		return true
+	case PlatformListUsersParamsRoleManager:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for PlatformListUsersParamsStatus.
+const (
+	PlatformListUsersParamsStatusActive   PlatformListUsersParamsStatus = "active"
+	PlatformListUsersParamsStatusDisabled PlatformListUsersParamsStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the PlatformListUsersParamsStatus enum.
+func (e PlatformListUsersParamsStatus) Valid() bool {
+	switch e {
+	case PlatformListUsersParamsStatusActive:
+		return true
+	case PlatformListUsersParamsStatusDisabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ListShiftsParamsStatus.
 const (
 	Draft     ListShiftsParamsStatus = "draft"
@@ -451,6 +679,9 @@ func (e ListShiftsParamsStatus) Valid() bool {
 		return false
 	}
 }
+
+// AccessLevel The product surface and privilege a role grants.
+type AccessLevel string
 
 // AttendanceRecord defines model for AttendanceRecord.
 type AttendanceRecord struct {
@@ -511,8 +742,12 @@ type CheckOutRequest struct {
 
 // CreateDepartmentRequest defines model for CreateDepartmentRequest.
 type CreateDepartmentRequest struct {
-	Name     string              `json:"name"`
-	ParentId *openapi_types.UUID `json:"parent_id,omitempty"`
+	Color          *string             `json:"color,omitempty"`
+	Description    *string             `json:"description,omitempty"`
+	Icon           *string             `json:"icon,omitempty"`
+	LeadEmployeeId *openapi_types.UUID `json:"lead_employee_id,omitempty"`
+	Name           string              `json:"name"`
+	ParentId       *openapi_types.UUID `json:"parent_id,omitempty"`
 }
 
 // CreateEmployeeRequest defines model for CreateEmployeeRequest.
@@ -570,9 +805,12 @@ type CreateLoginRequestRole string
 
 // CreateRoleRequest defines model for CreateRoleRequest.
 type CreateRoleRequest struct {
-	Description *string   `json:"description,omitempty"`
-	Name        string    `json:"name"`
-	Permissions *[]string `json:"permissions,omitempty"`
+	// AccessLevel The product surface and privilege a role grants.
+	AccessLevel  *AccessLevel        `json:"access_level,omitempty"`
+	DepartmentId *openapi_types.UUID `json:"department_id,omitempty"`
+	Description  *string             `json:"description,omitempty"`
+	Name         string              `json:"name"`
+	Permissions  *[]string           `json:"permissions,omitempty"`
 }
 
 // CreateShiftRequest defines model for CreateShiftRequest.
@@ -603,6 +841,11 @@ type CreateTourRequest struct {
 	Rating         *float64     `json:"rating,omitempty"`
 }
 
+// CurrentPlatformUserResponse defines model for CurrentPlatformUserResponse.
+type CurrentPlatformUserResponse struct {
+	User PlatformUserSummary `json:"user"`
+}
+
 // CurrentUserResponse defines model for CurrentUserResponse.
 type CurrentUserResponse struct {
 	Tenant TenantSummary `json:"tenant"`
@@ -611,11 +854,20 @@ type CurrentUserResponse struct {
 
 // Department defines model for Department.
 type Department struct {
-	CreatedAt time.Time           `json:"created_at"`
-	Id        openapi_types.UUID  `json:"id"`
-	Name      string              `json:"name"`
-	ParentId  *openapi_types.UUID `json:"parent_id,omitempty"`
-	UpdatedAt time.Time           `json:"updated_at"`
+	// Color Accent colour (hex) for UI.
+	Color       *string   `json:"color,omitempty"`
+	CreatedAt   time.Time `json:"created_at"`
+	Description *string   `json:"description,omitempty"`
+
+	// Icon Icon key for UI (e.g. route, briefcase).
+	Icon *string            `json:"icon,omitempty"`
+	Id   openapi_types.UUID `json:"id"`
+
+	// LeadEmployeeId The employee who leads this department, if set.
+	LeadEmployeeId *openapi_types.UUID `json:"lead_employee_id,omitempty"`
+	Name           string              `json:"name"`
+	ParentId       *openapi_types.UUID `json:"parent_id,omitempty"`
+	UpdatedAt      time.Time           `json:"updated_at"`
 }
 
 // Employee defines model for Employee.
@@ -737,12 +989,129 @@ type MyStats struct {
 	TenureDays *int `json:"tenure_days,omitempty"`
 }
 
+// PlatformAuthResponse defines model for PlatformAuthResponse.
+type PlatformAuthResponse struct {
+	ExpiresAt time.Time `json:"expires_at"`
+
+	// Token JWT access token with kind=platform.
+	Token     string                        `json:"token"`
+	TokenType PlatformAuthResponseTokenType `json:"token_type"`
+	User      PlatformUserSummary           `json:"user"`
+}
+
+// PlatformAuthResponseTokenType defines model for PlatformAuthResponse.TokenType.
+type PlatformAuthResponseTokenType string
+
+// PlatformLoginRequest defines model for PlatformLoginRequest.
+type PlatformLoginRequest struct {
+	Email    openapi_types.Email `json:"email"`
+	Password string              `json:"password"`
+}
+
+// PlatformSubscription defines model for PlatformSubscription.
+type PlatformSubscription struct {
+	CreatedAt  time.Time          `json:"created_at"`
+	Id         openapi_types.UUID `json:"id"`
+	Plan       string             `json:"plan"`
+	Status     string             `json:"status"`
+	TenantId   openapi_types.UUID `json:"tenant_id"`
+	TenantName string             `json:"tenant_name"`
+	TenantSlug string             `json:"tenant_slug"`
+	UpdatedAt  time.Time          `json:"updated_at"`
+}
+
+// PlatformSystemHealth defines model for PlatformSystemHealth.
+type PlatformSystemHealth struct {
+	ControlPlane    PlatformSystemHealthControlPlane `json:"control_plane"`
+	TenantsByStatus map[string]int                   `json:"tenants_by_status"`
+}
+
+// PlatformSystemHealthControlPlane defines model for PlatformSystemHealth.ControlPlane.
+type PlatformSystemHealthControlPlane string
+
+// PlatformTenant defines model for PlatformTenant.
+type PlatformTenant struct {
+	CreatedAt time.Time            `json:"created_at"`
+	DbName    string               `json:"db_name"`
+	Id        openapi_types.UUID   `json:"id"`
+	Name      string               `json:"name"`
+	Plan      string               `json:"plan"`
+	Slug      string               `json:"slug"`
+	Status    PlatformTenantStatus `json:"status"`
+	UpdatedAt time.Time            `json:"updated_at"`
+}
+
+// PlatformTenantStatus defines model for PlatformTenant.Status.
+type PlatformTenantStatus string
+
+// PlatformTenantUser defines model for PlatformTenantUser.
+type PlatformTenantUser struct {
+	CreatedAt  time.Time                `json:"created_at"`
+	Email      openapi_types.Email      `json:"email"`
+	Id         openapi_types.UUID       `json:"id"`
+	Role       PlatformTenantUserRole   `json:"role"`
+	Status     PlatformTenantUserStatus `json:"status"`
+	TenantId   openapi_types.UUID       `json:"tenant_id"`
+	TenantName string                   `json:"tenant_name"`
+	TenantSlug string                   `json:"tenant_slug"`
+	UpdatedAt  time.Time                `json:"updated_at"`
+}
+
+// PlatformTenantUserRole defines model for PlatformTenantUser.Role.
+type PlatformTenantUserRole string
+
+// PlatformTenantUserStatus defines model for PlatformTenantUser.Status.
+type PlatformTenantUserStatus string
+
+// PlatformUpdateSubscriptionRequest PATCH semantics — only provided fields change.
+type PlatformUpdateSubscriptionRequest struct {
+	Plan   *string `json:"plan,omitempty"`
+	Status *string `json:"status,omitempty"`
+}
+
+// PlatformUpdateTenantRequest PATCH semantics — only provided fields change.
+type PlatformUpdateTenantRequest struct {
+	Name   *string                            `json:"name,omitempty"`
+	Plan   *string                            `json:"plan,omitempty"`
+	Status *PlatformUpdateTenantRequestStatus `json:"status,omitempty"`
+}
+
+// PlatformUpdateTenantRequestStatus defines model for PlatformUpdateTenantRequest.Status.
+type PlatformUpdateTenantRequestStatus string
+
+// PlatformUpdateUserRequest defines model for PlatformUpdateUserRequest.
+type PlatformUpdateUserRequest struct {
+	Status PlatformUpdateUserRequestStatus `json:"status"`
+}
+
+// PlatformUpdateUserRequestStatus defines model for PlatformUpdateUserRequest.Status.
+type PlatformUpdateUserRequestStatus string
+
+// PlatformUserSummary defines model for PlatformUserSummary.
+type PlatformUserSummary struct {
+	Email  openapi_types.Email       `json:"email"`
+	Id     openapi_types.UUID        `json:"id"`
+	Role   PlatformUserSummaryRole   `json:"role"`
+	Status PlatformUserSummaryStatus `json:"status"`
+}
+
+// PlatformUserSummaryRole defines model for PlatformUserSummary.Role.
+type PlatformUserSummaryRole string
+
+// PlatformUserSummaryStatus defines model for PlatformUserSummary.Status.
+type PlatformUserSummaryStatus string
+
 // Role defines model for Role.
 type Role struct {
-	CreatedAt   time.Time          `json:"created_at"`
-	Description *string            `json:"description,omitempty"`
-	Id          openapi_types.UUID `json:"id"`
-	Name        string             `json:"name"`
+	// AccessLevel The product surface and privilege a role grants.
+	AccessLevel AccessLevel `json:"access_level"`
+	CreatedAt   time.Time   `json:"created_at"`
+
+	// DepartmentId The department this role belongs to, if set.
+	DepartmentId *openapi_types.UUID `json:"department_id,omitempty"`
+	Description  *string             `json:"description,omitempty"`
+	Id           openapi_types.UUID  `json:"id"`
+	Name         string              `json:"name"`
 
 	// Permissions Permission keys granted by this role. Stored but not enforced in v1.
 	Permissions []string  `json:"permissions"`
@@ -776,6 +1145,21 @@ type SignupRequest struct {
 
 	// Slug URL/login-friendly tenant identifier. If omitted, derived from the company name. Lowercase letters, digits, and hyphens.
 	Slug *string `json:"slug,omitempty"`
+}
+
+// SuperAdminAuditEvent defines model for SuperAdminAuditEvent.
+type SuperAdminAuditEvent struct {
+	Action              string                 `json:"action"`
+	ActorEmail          openapi_types.Email    `json:"actor_email"`
+	ActorPlatformUserId openapi_types.UUID     `json:"actor_platform_user_id"`
+	CreatedAt           time.Time              `json:"created_at"`
+	Id                  openapi_types.UUID     `json:"id"`
+	Metadata            map[string]interface{} `json:"metadata"`
+	TargetId            *openapi_types.UUID    `json:"target_id,omitempty"`
+	TargetType          string                 `json:"target_type"`
+	TenantId            *openapi_types.UUID    `json:"tenant_id,omitempty"`
+	TenantName          *string                `json:"tenant_name,omitempty"`
+	TenantSlug          *string                `json:"tenant_slug,omitempty"`
 }
 
 // TenantSummary defines model for TenantSummary.
@@ -828,8 +1212,12 @@ type TourCategory string
 
 // UpdateDepartmentRequest PATCH semantics — only provided fields are changed. Fields cannot be cleared back to null via PATCH in v1 (omitting a field and sending null are equivalent).
 type UpdateDepartmentRequest struct {
-	Name     *string             `json:"name,omitempty"`
-	ParentId *openapi_types.UUID `json:"parent_id,omitempty"`
+	Color          *string             `json:"color,omitempty"`
+	Description    *string             `json:"description,omitempty"`
+	Icon           *string             `json:"icon,omitempty"`
+	LeadEmployeeId *openapi_types.UUID `json:"lead_employee_id,omitempty"`
+	Name           *string             `json:"name,omitempty"`
+	ParentId       *openapi_types.UUID `json:"parent_id,omitempty"`
 }
 
 // UpdateEmployeeRequest PATCH semantics — only provided fields are changed. Fields cannot be cleared back to null via PATCH in v1 (omitting a field and sending null are equivalent).
@@ -861,9 +1249,12 @@ type UpdateLocationRequest struct {
 
 // UpdateRoleRequest PATCH semantics — only provided fields are changed. permissions, when provided, replaces the whole set.
 type UpdateRoleRequest struct {
-	Description *string   `json:"description,omitempty"`
-	Name        *string   `json:"name,omitempty"`
-	Permissions *[]string `json:"permissions,omitempty"`
+	// AccessLevel The product surface and privilege a role grants.
+	AccessLevel  *AccessLevel        `json:"access_level,omitempty"`
+	DepartmentId *openapi_types.UUID `json:"department_id,omitempty"`
+	Description  *string             `json:"description,omitempty"`
+	Name         *string             `json:"name,omitempty"`
+	Permissions  *[]string           `json:"permissions,omitempty"`
 }
 
 // UpdateShiftRequest PATCH semantics — only provided fields are changed; fields cannot be cleared to null in v1. Status transitions go through POST /shifts/{id}/publish.
@@ -976,6 +1367,34 @@ type ListMyShiftsParams struct {
 // ListMyShiftsParamsStatus defines parameters for ListMyShifts.
 type ListMyShiftsParamsStatus string
 
+// PlatformListAuditEventsParams defines parameters for PlatformListAuditEvents.
+type PlatformListAuditEventsParams struct {
+	TenantId            *openapi_types.UUID `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+	ActorPlatformUserId *openapi_types.UUID `form:"actor_platform_user_id,omitempty" json:"actor_platform_user_id,omitempty"`
+	Action              *string             `form:"action,omitempty" json:"action,omitempty"`
+	Limit               *int                `form:"limit,omitempty" json:"limit,omitempty"`
+}
+
+// PlatformListSubscriptionsParams defines parameters for PlatformListSubscriptions.
+type PlatformListSubscriptionsParams struct {
+	TenantId *openapi_types.UUID `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+	Plan     *string             `form:"plan,omitempty" json:"plan,omitempty"`
+	Status   *string             `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// PlatformListUsersParams defines parameters for PlatformListUsers.
+type PlatformListUsersParams struct {
+	TenantId *openapi_types.UUID            `form:"tenant_id,omitempty" json:"tenant_id,omitempty"`
+	Role     *PlatformListUsersParamsRole   `form:"role,omitempty" json:"role,omitempty"`
+	Status   *PlatformListUsersParamsStatus `form:"status,omitempty" json:"status,omitempty"`
+}
+
+// PlatformListUsersParamsRole defines parameters for PlatformListUsers.
+type PlatformListUsersParamsRole string
+
+// PlatformListUsersParamsStatus defines parameters for PlatformListUsers.
+type PlatformListUsersParamsStatus string
+
 // ListShiftsParams defines parameters for ListShifts.
 type ListShiftsParams struct {
 	EmployeeId *openapi_types.UUID     `form:"employee_id,omitempty" json:"employee_id,omitempty"`
@@ -1032,6 +1451,18 @@ type UpdateLocationJSONRequestBody = UpdateLocationRequest
 
 // CreateMyLeaveJSONRequestBody defines body for CreateMyLeave for application/json ContentType.
 type CreateMyLeaveJSONRequestBody = CreateLeaveRequest
+
+// PlatformLoginJSONRequestBody defines body for PlatformLogin for application/json ContentType.
+type PlatformLoginJSONRequestBody = PlatformLoginRequest
+
+// PlatformUpdateSubscriptionJSONRequestBody defines body for PlatformUpdateSubscription for application/json ContentType.
+type PlatformUpdateSubscriptionJSONRequestBody = PlatformUpdateSubscriptionRequest
+
+// PlatformUpdateTenantJSONRequestBody defines body for PlatformUpdateTenant for application/json ContentType.
+type PlatformUpdateTenantJSONRequestBody = PlatformUpdateTenantRequest
+
+// PlatformUpdateUserJSONRequestBody defines body for PlatformUpdateUser for application/json ContentType.
+type PlatformUpdateUserJSONRequestBody = PlatformUpdateUserRequest
 
 // CreateRoleJSONRequestBody defines body for CreateRole for application/json ContentType.
 type CreateRoleJSONRequestBody = CreateRoleRequest
@@ -1146,6 +1577,39 @@ type ServerInterface interface {
 	// The authenticated employee's personal activity stats.
 	// (GET /me/stats)
 	GetMyStats(w http.ResponseWriter, r *http.Request)
+	// List Super Admin audit events.
+	// (GET /platform/audit-events)
+	PlatformListAuditEvents(w http.ResponseWriter, r *http.Request, params PlatformListAuditEventsParams)
+	// Log in as an Opero platform user.
+	// (POST /platform/auth/login)
+	PlatformLogin(w http.ResponseWriter, r *http.Request)
+	// Get the currently authenticated platform user.
+	// (GET /platform/auth/me)
+	GetCurrentPlatformUser(w http.ResponseWriter, r *http.Request)
+	// List subscriptions.
+	// (GET /platform/subscriptions)
+	PlatformListSubscriptions(w http.ResponseWriter, r *http.Request, params PlatformListSubscriptionsParams)
+	// Update a subscription.
+	// (PATCH /platform/subscriptions/{id})
+	PlatformUpdateSubscription(w http.ResponseWriter, r *http.Request, id IdParam)
+	// Get platform health summary.
+	// (GET /platform/system/health)
+	PlatformGetSystemHealth(w http.ResponseWriter, r *http.Request)
+	// List tenants.
+	// (GET /platform/tenants)
+	PlatformListTenants(w http.ResponseWriter, r *http.Request)
+	// Get a tenant.
+	// (GET /platform/tenants/{id})
+	PlatformGetTenant(w http.ResponseWriter, r *http.Request, id IdParam)
+	// Update tenant platform state.
+	// (PATCH /platform/tenants/{id})
+	PlatformUpdateTenant(w http.ResponseWriter, r *http.Request, id IdParam)
+	// List tenant login users.
+	// (GET /platform/users)
+	PlatformListUsers(w http.ResponseWriter, r *http.Request, params PlatformListUsersParams)
+	// Update a tenant login user.
+	// (PATCH /platform/users/{id})
+	PlatformUpdateUser(w http.ResponseWriter, r *http.Request, id IdParam)
 	// List roles.
 	// (GET /roles)
 	ListRoles(w http.ResponseWriter, r *http.Request)
@@ -1383,6 +1847,72 @@ func (_ Unimplemented) ListMyShifts(w http.ResponseWriter, r *http.Request, para
 // The authenticated employee's personal activity stats.
 // (GET /me/stats)
 func (_ Unimplemented) GetMyStats(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List Super Admin audit events.
+// (GET /platform/audit-events)
+func (_ Unimplemented) PlatformListAuditEvents(w http.ResponseWriter, r *http.Request, params PlatformListAuditEventsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Log in as an Opero platform user.
+// (POST /platform/auth/login)
+func (_ Unimplemented) PlatformLogin(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get the currently authenticated platform user.
+// (GET /platform/auth/me)
+func (_ Unimplemented) GetCurrentPlatformUser(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List subscriptions.
+// (GET /platform/subscriptions)
+func (_ Unimplemented) PlatformListSubscriptions(w http.ResponseWriter, r *http.Request, params PlatformListSubscriptionsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a subscription.
+// (PATCH /platform/subscriptions/{id})
+func (_ Unimplemented) PlatformUpdateSubscription(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get platform health summary.
+// (GET /platform/system/health)
+func (_ Unimplemented) PlatformGetSystemHealth(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List tenants.
+// (GET /platform/tenants)
+func (_ Unimplemented) PlatformListTenants(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a tenant.
+// (GET /platform/tenants/{id})
+func (_ Unimplemented) PlatformGetTenant(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update tenant platform state.
+// (PATCH /platform/tenants/{id})
+func (_ Unimplemented) PlatformUpdateTenant(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List tenant login users.
+// (GET /platform/users)
+func (_ Unimplemented) PlatformListUsers(w http.ResponseWriter, r *http.Request, params PlatformListUsersParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a tenant login user.
+// (PATCH /platform/users/{id})
+func (_ Unimplemented) PlatformUpdateUser(w http.ResponseWriter, r *http.Request, id IdParam) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -2442,6 +2972,416 @@ func (siw *ServerInterfaceWrapper) GetMyStats(w http.ResponseWriter, r *http.Req
 	handler.ServeHTTP(w, r)
 }
 
+// PlatformListAuditEvents operation middleware
+func (siw *ServerInterfaceWrapper) PlatformListAuditEvents(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PlatformListAuditEventsParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tenant_id", r.URL.Query(), &params.TenantId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tenant_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "actor_platform_user_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "actor_platform_user_id", r.URL.Query(), &params.ActorPlatformUserId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "actor_platform_user_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "actor_platform_user_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "action" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "action", r.URL.Query(), &params.Action, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "action"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "action", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "limit" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "limit", r.URL.Query(), &params.Limit, runtime.BindQueryParameterOptions{Type: "integer", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "limit"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "limit", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformListAuditEvents(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformLogin operation middleware
+func (siw *ServerInterfaceWrapper) PlatformLogin(w http.ResponseWriter, r *http.Request) {
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformLogin(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetCurrentPlatformUser operation middleware
+func (siw *ServerInterfaceWrapper) GetCurrentPlatformUser(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetCurrentPlatformUser(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformListSubscriptions operation middleware
+func (siw *ServerInterfaceWrapper) PlatformListSubscriptions(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PlatformListSubscriptionsParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tenant_id", r.URL.Query(), &params.TenantId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tenant_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "plan" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "plan", r.URL.Query(), &params.Plan, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "plan"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "plan", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformListSubscriptions(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformUpdateSubscription operation middleware
+func (siw *ServerInterfaceWrapper) PlatformUpdateSubscription(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformUpdateSubscription(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformGetSystemHealth operation middleware
+func (siw *ServerInterfaceWrapper) PlatformGetSystemHealth(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformGetSystemHealth(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformListTenants operation middleware
+func (siw *ServerInterfaceWrapper) PlatformListTenants(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformListTenants(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformGetTenant operation middleware
+func (siw *ServerInterfaceWrapper) PlatformGetTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformGetTenant(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformUpdateTenant operation middleware
+func (siw *ServerInterfaceWrapper) PlatformUpdateTenant(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformUpdateTenant(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformListUsers operation middleware
+func (siw *ServerInterfaceWrapper) PlatformListUsers(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params PlatformListUsersParams
+
+	// ------------- Optional query parameter "tenant_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "tenant_id", r.URL.Query(), &params.TenantId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "tenant_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "tenant_id", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "role" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "role", r.URL.Query(), &params.Role, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "role"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "role", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformListUsers(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// PlatformUpdateUser operation middleware
+func (siw *ServerInterfaceWrapper) PlatformUpdateUser(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.PlatformUpdateUser(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListRoles operation middleware
 func (siw *ServerInterfaceWrapper) ListRoles(w http.ResponseWriter, r *http.Request) {
 
@@ -3179,6 +4119,39 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Get(options.BaseURL+"/me/stats", wrapper.GetMyStats)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/audit-events", wrapper.PlatformListAuditEvents)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/platform/auth/login", wrapper.PlatformLogin)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/auth/me", wrapper.GetCurrentPlatformUser)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/subscriptions", wrapper.PlatformListSubscriptions)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/platform/subscriptions/{id}", wrapper.PlatformUpdateSubscription)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/system/health", wrapper.PlatformGetSystemHealth)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/tenants", wrapper.PlatformListTenants)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/tenants/{id}", wrapper.PlatformGetTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/platform/tenants/{id}", wrapper.PlatformUpdateTenant)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/platform/users", wrapper.PlatformListUsers)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/platform/users/{id}", wrapper.PlatformUpdateUser)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/roles", wrapper.ListRoles)
 	})
 	r.Group(func(r chi.Router) {
@@ -3235,119 +4208,141 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
-	"n9Hl7QF256j653N0/PH9x/8LAAD//w==",
+	"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",
+	"uQdxQ2I2A9m+nqWQzx8//08AAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

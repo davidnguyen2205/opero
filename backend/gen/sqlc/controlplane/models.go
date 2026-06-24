@@ -9,6 +9,16 @@ import (
 	"github.com/jackc/pgx/v5/pgtype"
 )
 
+type PlatformUser struct {
+	ID           uuid.UUID
+	Email        string
+	PasswordHash string
+	Role         string
+	Status       string
+	CreatedAt    pgtype.Timestamptz
+	UpdatedAt    pgtype.Timestamptz
+}
+
 type Subscription struct {
 	ID        uuid.UUID
 	TenantID  uuid.UUID
@@ -16,6 +26,17 @@ type Subscription struct {
 	Status    string
 	CreatedAt pgtype.Timestamptz
 	UpdatedAt pgtype.Timestamptz
+}
+
+type SuperAdminAuditEvent struct {
+	ID                  uuid.UUID
+	ActorPlatformUserID uuid.UUID
+	Action              string
+	TargetType          string
+	TargetID            pgtype.UUID
+	TenantID            pgtype.UUID
+	Metadata            []byte
+	CreatedAt           pgtype.Timestamptz
 }
 
 type Tenant struct {

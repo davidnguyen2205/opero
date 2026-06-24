@@ -21,6 +21,20 @@ const (
 // context. It always enforces a valid token, so apply it only to routes that
 // require authentication (see the spec-driven gating in the httpserver package).
 func Authenticator(tm *auth.TokenManager, logger *slog.Logger) func(http.Handler) http.Handler {
+	return authenticator(tm, logger, "")
+}
+
+// TenantAuthenticator validates a tenant token and rejects platform tokens.
+func TenantAuthenticator(tm *auth.TokenManager, logger *slog.Logger) func(http.Handler) http.Handler {
+	return authenticator(tm, logger, "tenant")
+}
+
+// PlatformAuthenticator validates a platform token and rejects tenant tokens.
+func PlatformAuthenticator(tm *auth.TokenManager, logger *slog.Logger) func(http.Handler) http.Handler {
+	return authenticator(tm, logger, "platform")
+}
+
+func authenticator(tm *auth.TokenManager, logger *slog.Logger, requiredKind string) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			raw := bearerToken(r.Header.Get("Authorization"))
@@ -31,6 +45,13 @@ func Authenticator(tm *auth.TokenManager, logger *slog.Logger) func(http.Handler
 			claims, err := tm.Parse(raw)
 			if err != nil {
 				logger.DebugContext(r.Context(), "token parse failed", slog.Any("error", err))
+				WriteUnauthorized(w)
+				return
+			}
+			if requiredKind != "" && claims.Kind != requiredKind {
+				logger.DebugContext(r.Context(), "token kind rejected",
+					slog.String("required_kind", requiredKind),
+					slog.String("actual_kind", claims.Kind))
 				WriteUnauthorized(w)
 				return
 			}

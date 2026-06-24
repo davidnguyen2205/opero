@@ -11,6 +11,38 @@ import (
 	"github.com/google/uuid"
 )
 
+const countTenantsByStatus = `-- name: CountTenantsByStatus :many
+SELECT status, count(*)::bigint AS count
+FROM tenants
+GROUP BY status
+ORDER BY status
+`
+
+type CountTenantsByStatusRow struct {
+	Status string
+	Count  int64
+}
+
+func (q *Queries) CountTenantsByStatus(ctx context.Context) ([]CountTenantsByStatusRow, error) {
+	rows, err := q.db.Query(ctx, countTenantsByStatus)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []CountTenantsByStatusRow
+	for rows.Next() {
+		var i CountTenantsByStatusRow
+		if err := rows.Scan(&i.Status, &i.Count); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
 const createTenant = `-- name: CreateTenant :one
 INSERT INTO tenants (name, slug, db_name, status, plan)
 VALUES ($1, $2, $3, $4, $5)
@@ -141,6 +173,44 @@ type SetTenantStatusParams struct {
 
 func (q *Queries) SetTenantStatus(ctx context.Context, arg SetTenantStatusParams) (Tenant, error) {
 	row := q.db.QueryRow(ctx, setTenantStatus, arg.ID, arg.Status)
+	var i Tenant
+	err := row.Scan(
+		&i.ID,
+		&i.Name,
+		&i.Slug,
+		&i.DbName,
+		&i.Status,
+		&i.Plan,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
+
+const updateTenantPlatform = `-- name: UpdateTenantPlatform :one
+UPDATE tenants
+SET
+    name = COALESCE($1, name),
+    status = COALESCE($2, status),
+    plan = COALESCE($3, plan)
+WHERE id = $4
+RETURNING id, name, slug, db_name, status, plan, created_at, updated_at
+`
+
+type UpdateTenantPlatformParams struct {
+	Name   *string
+	Status *string
+	Plan   *string
+	ID     uuid.UUID
+}
+
+func (q *Queries) UpdateTenantPlatform(ctx context.Context, arg UpdateTenantPlatformParams) (Tenant, error) {
+	row := q.db.QueryRow(ctx, updateTenantPlatform,
+		arg.Name,
+		arg.Status,
+		arg.Plan,
+		arg.ID,
+	)
 	var i Tenant
 	err := row.Scan(
 		&i.ID,

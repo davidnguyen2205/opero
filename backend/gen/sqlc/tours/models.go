@@ -30,11 +30,15 @@ type AttendanceRecord struct {
 }
 
 type Department struct {
-	ID        uuid.UUID
-	Name      string
-	ParentID  pgtype.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             uuid.UUID
+	Name           string
+	ParentID       pgtype.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Description    *string
+	LeadEmployeeID pgtype.UUID
+	Icon           *string
+	Color          *string
 }
 
 type Employee struct {
@@ -87,12 +91,14 @@ type Location struct {
 }
 
 type Role struct {
-	ID          uuid.UUID
-	Name        string
-	Description *string
-	Permissions []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	Name         string
+	Description  *string
+	Permissions  []string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	AccessLevel  string
+	DepartmentID pgtype.UUID
 }
 
 type Shift struct {

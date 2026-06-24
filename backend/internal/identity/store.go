@@ -81,11 +81,15 @@ func fromPgDate(v pgtype.Date) *time.Time {
 
 func deptFromDB(d identitydb.Department) Department {
 	return Department{
-		ID:        d.ID,
-		Name:      d.Name,
-		ParentID:  fromPgUUID(d.ParentID),
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
+		ID:             d.ID,
+		Name:           d.Name,
+		ParentID:       fromPgUUID(d.ParentID),
+		Description:    d.Description,
+		LeadEmployeeID: fromPgUUID(d.LeadEmployeeID),
+		Icon:           d.Icon,
+		Color:          d.Color,
+		CreatedAt:      d.CreatedAt,
+		UpdatedAt:      d.UpdatedAt,
 	}
 }
 
@@ -95,12 +99,14 @@ func roleFromDB(r identitydb.Role) Role {
 		perms = []string{}
 	}
 	return Role{
-		ID:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Permissions: perms,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		ID:           r.ID,
+		Name:         r.Name,
+		Description:  r.Description,
+		DepartmentID: fromPgUUID(r.DepartmentID),
+		AccessLevel:  r.AccessLevel,
+		Permissions:  perms,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
 	}
 }
 
@@ -126,8 +132,12 @@ func empFromDB(e identitydb.Employee) Employee {
 
 func (s *Store) CreateDepartment(ctx context.Context, in CreateDepartmentInput) (Department, error) {
 	d, err := s.q.CreateDepartment(ctx, identitydb.CreateDepartmentParams{
-		Name:     in.Name,
-		ParentID: toPgUUID(in.ParentID),
+		Name:           in.Name,
+		ParentID:       toPgUUID(in.ParentID),
+		Description:    in.Description,
+		LeadEmployeeID: toPgUUID(in.LeadEmployeeID),
+		Icon:           in.Icon,
+		Color:          in.Color,
 	})
 	if err != nil {
 		return Department{}, fmt.Errorf("create department: %w", mapErr(err))
@@ -157,9 +167,13 @@ func (s *Store) ListDepartments(ctx context.Context) ([]Department, error) {
 
 func (s *Store) UpdateDepartment(ctx context.Context, id uuid.UUID, in UpdateDepartmentInput) (Department, error) {
 	d, err := s.q.UpdateDepartment(ctx, identitydb.UpdateDepartmentParams{
-		Name:     in.Name,
-		ParentID: toPgUUID(in.ParentID),
-		ID:       id,
+		Name:           in.Name,
+		ParentID:       toPgUUID(in.ParentID),
+		Description:    in.Description,
+		LeadEmployeeID: toPgUUID(in.LeadEmployeeID),
+		Icon:           in.Icon,
+		Color:          in.Color,
+		ID:             id,
 	})
 	if err != nil {
 		return Department{}, fmt.Errorf("update department: %w", mapErr(err))
@@ -288,10 +302,16 @@ func (s *Store) CreateRole(ctx context.Context, in CreateRoleInput) (Role, error
 	if perms == nil {
 		perms = []string{}
 	}
+	access := in.AccessLevel
+	if access == "" {
+		access = "web_manager" // matches the column default
+	}
 	r, err := s.q.CreateRole(ctx, identitydb.CreateRoleParams{
-		Name:        in.Name,
-		Description: in.Description,
-		Permissions: perms,
+		Name:         in.Name,
+		Description:  in.Description,
+		DepartmentID: toPgUUID(in.DepartmentID),
+		AccessLevel:  access,
+		Permissions:  perms,
 	})
 	if err != nil {
 		return Role{}, fmt.Errorf("create role: %w", mapErr(err))
@@ -321,10 +341,12 @@ func (s *Store) ListRoles(ctx context.Context) ([]Role, error) {
 
 func (s *Store) UpdateRole(ctx context.Context, id uuid.UUID, in UpdateRoleInput) (Role, error) {
 	r, err := s.q.UpdateRole(ctx, identitydb.UpdateRoleParams{
-		Name:        in.Name,
-		Description: in.Description,
-		Permissions: in.Permissions,
-		ID:          id,
+		Name:         in.Name,
+		Description:  in.Description,
+		DepartmentID: toPgUUID(in.DepartmentID),
+		AccessLevel:  in.AccessLevel,
+		Permissions:  in.Permissions,
+		ID:           id,
 	})
 	if err != nil {
 		return Role{}, fmt.Errorf("update role: %w", mapErr(err))
