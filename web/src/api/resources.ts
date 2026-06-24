@@ -24,6 +24,8 @@ export type CreateRoleRequest = components["schemas"]["CreateRoleRequest"];
 export type CreateShiftRequest = components["schemas"]["CreateShiftRequest"];
 export type UpdateEmployeeRequest = components["schemas"]["UpdateEmployeeRequest"];
 export type UpdateShiftRequest = components["schemas"]["UpdateShiftRequest"];
+export type UpdateDepartmentRequest = components["schemas"]["UpdateDepartmentRequest"];
+export type UpdateRoleRequest = components["schemas"]["UpdateRoleRequest"];
 export type LoginRequest = components["schemas"]["LoginRequest"];
 export type SignupRequest = components["schemas"]["SignupRequest"];
 
@@ -95,6 +97,12 @@ export const departmentsApi = {
       "Unable to create department.",
     );
   },
+  async update(id: string, body: UpdateDepartmentRequest): Promise<Department> {
+    return unwrap(
+      await api.PATCH("/departments/{id}", { params: { path: { id } }, body }),
+      "Unable to update department.",
+    );
+  },
   async delete(id: string): Promise<void> {
     await unwrapEmpty(
       await api.DELETE("/departments/{id}", { params: { path: { id } } }),
@@ -141,6 +149,12 @@ export const rolesApi = {
     return unwrap(
       await api.POST("/roles", { body }),
       "Unable to create role.",
+    );
+  },
+  async update(id: string, body: UpdateRoleRequest): Promise<Role> {
+    return unwrap(
+      await api.PATCH("/roles/{id}", { params: { path: { id } }, body }),
+      "Unable to update role.",
     );
   },
   async delete(id: string): Promise<void> {

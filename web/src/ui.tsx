@@ -32,6 +32,7 @@ export type IconName =
   | "refresh"
   | "x"
   | "route"
+  | "pencil"
   | "wifi";
 
 const ICON_PATHS: Record<IconName, string> = {
@@ -68,6 +69,7 @@ const ICON_PATHS: Record<IconName, string> = {
   x: "M18 6 6 18M6 6l12 12",
   route:
     "M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM9 16h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h0",
+  pencil: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z",
   wifi: "M5 12.55a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01",
 };
 
@@ -563,6 +565,184 @@ export function Field({ label, children }: { label: string; children: ReactNode 
       <label style={labelStyle}>{label}</label>
       {children}
     </div>
+  );
+}
+
+// ── Sorting (mirrors the prototype's useSort/sortRows/SortTh) ──────────────
+export type SortState = { key: string | null; dir: "asc" | "desc" };
+
+export function useSort(
+  defaultKey: string | null,
+  defaultDir: "asc" | "desc" = "asc",
+): [SortState, (key: string) => void] {
+  const [sort, setSort] = useState<SortState>({ key: defaultKey, dir: defaultDir });
+  const toggle = (key: string) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "asc" ? "desc" : "asc" } : { key, dir: "asc" }));
+  return [sort, toggle];
+}
+
+export function sortRows<T>(
+  rows: T[],
+  sort: SortState,
+  accessors: Record<string, (row: T) => string | number | null | undefined>,
+): T[] {
+  if (!sort.key || !accessors[sort.key]) return rows;
+  const acc = accessors[sort.key];
+  const out = [...rows].sort((a, b) => {
+    const va = acc(a);
+    const vb = acc(b);
+    if (va == null && vb == null) return 0;
+    if (va == null) return 1;
+    if (vb == null) return -1;
+    if (typeof va === "number" && typeof vb === "number") return va - vb;
+    return String(va).localeCompare(String(vb), undefined, { numeric: true });
+  });
+  return sort.dir === "desc" ? out.reverse() : out;
+}
+
+// Sortable <th>. Pass sortKey=null for non-sortable columns (e.g. action cells).
+export function SortTh({
+  label,
+  sortKey,
+  sort,
+  onSort,
+  align = "left",
+}: {
+  label: string;
+  sortKey: string | null;
+  sort: SortState;
+  onSort: (key: string) => void;
+  align?: "left" | "right";
+}) {
+  const active = sort.key === sortKey;
+  const sortable = sortKey != null;
+  return (
+    <th
+      onClick={sortable ? () => onSort(sortKey) : undefined}
+      style={{
+        padding: "11px 16px",
+        fontWeight: 600,
+        fontSize: 12,
+        borderBottom: "1px solid var(--adaptive-200)",
+        whiteSpace: "nowrap",
+        textAlign: align,
+        userSelect: "none",
+        cursor: sortable ? "pointer" : "default",
+        color: active ? "var(--adaptive-800)" : "var(--adaptive-500)",
+        background: "var(--adaptive-50)",
+      }}
+    >
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          gap: 5,
+          flexDirection: align === "right" ? "row-reverse" : "row",
+        }}
+      >
+        {label}
+        {sortable && (
+          <svg
+            width="12"
+            height="12"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2.2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            style={{ opacity: active ? 1 : 0.28, color: active ? "var(--primary-600)" : "currentColor" }}
+          >
+            {active ? (
+              sort.dir === "asc" ? (
+                <path d="M18 15l-6-6-6 6" />
+              ) : (
+                <path d="M6 9l6 6 6-6" />
+              )
+            ) : (
+              <>
+                <path d="M8 9l4-4 4 4" />
+                <path d="M16 15l-4 4-4-4" />
+              </>
+            )}
+          </svg>
+        )}
+      </span>
+    </th>
+  );
+}
+
+// ── Grid/list segmented toggle (shared by Tours, Departments) ─────────────
+export function ViewToggle({ value, onChange }: { value: "grid" | "list"; onChange: (v: "grid" | "list") => void }) {
+  return (
+    <div style={{ display: "inline-flex", background: "var(--adaptive-100)", borderRadius: 7, padding: 3, gap: 2 }}>
+      {(["grid", "list"] as const).map((o) => {
+        const on = o === value;
+        return (
+          <button
+            key={o}
+            onClick={() => onChange(o)}
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+              padding: "6px 12px",
+              borderRadius: 5,
+              border: 0,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              fontSize: 12.5,
+              fontWeight: 600,
+              textTransform: "capitalize",
+              background: on ? "var(--card)" : "transparent",
+              color: on ? "var(--adaptive-900)" : "var(--adaptive-500)",
+              boxShadow: on ? "var(--shadow-xs)" : "none",
+            }}
+          >
+            <Icon name={o === "grid" ? "grid" : "list"} size={15} color={on ? "var(--primary-600)" : "var(--adaptive-400)"} />
+            {o}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+// ── Square icon action buttons for table rows ─────────────────────────────
+export function IconButton({
+  icon,
+  title,
+  onClick,
+  tone = "neutral",
+}: {
+  icon: IconName;
+  title: string;
+  onClick: () => void;
+  tone?: "neutral" | "danger";
+}) {
+  const danger = tone === "danger";
+  return (
+    <button
+      title={title}
+      aria-label={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      style={{
+        width: 30,
+        height: 30,
+        borderRadius: 6,
+        border: `1px solid ${danger ? "var(--red-200)" : "var(--adaptive-200)"}`,
+        background: danger ? "var(--red-50)" : "var(--card)",
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+      }}
+    >
+      <Icon name={icon} size={14} color={danger ? "var(--red-600)" : "var(--adaptive-600)"} />
+    </button>
   );
 }
 

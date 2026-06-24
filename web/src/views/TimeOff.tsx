@@ -9,7 +9,10 @@ import {
   DrawerSectionLabel,
   Icon,
   PageHeader,
+  SortTh,
   humanize,
+  sortRows,
+  useSort,
 } from "../ui";
 import type { ChipTone } from "../ui";
 
@@ -185,6 +188,7 @@ export function TimeOff({
 }) {
   const [tab, setTab] = useState<Tab>("pending");
   const [sel, setSel] = useState<LeaveRequest | null>(null);
+  const [sort, toggleSort] = useSort("start_date", "desc");
 
   const nameById = useMemo(
     () => new Map(employees.map((e) => [e.id, e.full_name])),
@@ -201,7 +205,14 @@ export function TimeOff({
     .filter((r) => r.status === "approved")
     .reduce((n, r) => n + daysInclusive(r.start_date, r.end_date), 0);
 
-  const shown = tab === "all" ? requests : requests.filter((r) => r.status === tab);
+  const filtered = tab === "all" ? requests : requests.filter((r) => r.status === tab);
+  const shown = sortRows(filtered, sort, {
+    employee: (r) => nameFor(r.employee_id),
+    type: (r) => r.type,
+    start_date: (r) => r.start_date,
+    days: (r) => daysInclusive(r.start_date, r.end_date),
+    status: (r) => r.status,
+  });
   const tabs: [Tab, string, number][] = [
     ["pending", "Pending", counts.pending],
     ["approved", "Approved", counts.approved],
@@ -278,21 +289,18 @@ export function TimeOff({
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
               <thead>
-                <tr style={{ background: "var(--adaptive-50)", textAlign: "left" }}>
-                  {["Employee", "Type", "Dates", "Days", "Status", ""].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        padding: "11px 16px",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: "var(--adaptive-500)",
-                        borderBottom: "1px solid var(--adaptive-200)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
+                <tr>
+                  {(
+                    [
+                      ["Employee", "employee"],
+                      ["Type", "type"],
+                      ["Dates", "start_date"],
+                      ["Days", "days"],
+                      ["Status", "status"],
+                      ["", null],
+                    ] as const
+                  ).map(([label, key], i) => (
+                    <SortTh key={i} label={label} sortKey={key} sort={sort} onSort={toggleSort} align={key === null ? "right" : "left"} />
                   ))}
                 </tr>
               </thead>

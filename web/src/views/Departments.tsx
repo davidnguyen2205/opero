@@ -3,6 +3,7 @@ import type {
   CreateDepartmentRequest,
   Department,
   Employee,
+  UpdateDepartmentRequest,
 } from "../api/resources";
 import {
   Avatar,
@@ -14,15 +15,18 @@ import {
   DrawerSectionLabel,
   Field,
   Icon,
+  IconButton,
   PageHeader,
+  SortTh,
+  ViewToggle,
   colorForId,
   controlStyle,
   humanize,
+  sortRows,
+  useSort,
 } from "../ui";
 import type { IconName, Person } from "../ui";
 
-// Departments in the API carry no icon/color; derive a stable presentational
-// one from the id so cards read as distinct without inventing data.
 const DEPT_ICONS: IconName[] = ["briefcase", "route", "activity", "users", "grid", "pin"];
 function deptIcon(id: string): IconName {
   let total = 0;
@@ -34,18 +38,20 @@ function toPeople(employees: Employee[]): Person[] {
   return employees.map((e) => ({ id: e.id, name: e.full_name }));
 }
 
-function DeptDrawer({
+function DeptDetailDrawer({
   dept,
   members,
   parentName,
   onClose,
+  onEdit,
   onDelete,
 }: {
   dept: Department;
   members: Employee[];
   parentName: string | null;
   onClose: () => void;
-  onDelete: (id: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   const color = colorForId(dept.id);
   return (
@@ -78,17 +84,22 @@ function DeptDrawer({
         </>
       }
       footer={
-        <Btn
-          variant="secondary"
-          icon="x"
-          style={{ flex: 1, color: "var(--red-700)", borderColor: "var(--red-200)" }}
-          onClick={() => {
-            onDelete(dept.id);
-            onClose();
-          }}
-        >
-          Delete department
-        </Btn>
+        <>
+          <Btn
+            variant="secondary"
+            icon="x"
+            style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
+            onClick={() => {
+              onDelete();
+              onClose();
+            }}
+          >
+            Delete
+          </Btn>
+          <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
+            Edit Department
+          </Btn>
+        </>
       }
     >
       <div>
@@ -114,17 +125,22 @@ function DeptDrawer({
   );
 }
 
-function AddDeptDrawer({
+function DeptFormDrawer({
+  dept,
   departments,
   onClose,
   onCreate,
+  onUpdate,
 }: {
+  dept: Department | null;
   departments: Department[];
   onClose: () => void;
   onCreate: (body: CreateDepartmentRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateDepartmentRequest) => Promise<void>;
 }) {
-  const [name, setName] = useState("");
-  const [parentId, setParentId] = useState("");
+  const isEdit = Boolean(dept);
+  const [name, setName] = useState(dept?.name ?? "");
+  const [parentId, setParentId] = useState(dept?.parent_id ?? "");
   const [submitting, setSubmitting] = useState(false);
   const canSubmit = name.trim().length > 0 && !submitting;
 
@@ -132,25 +148,33 @@ function AddDeptDrawer({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onCreate({ name: name.trim(), parent_id: parentId || undefined });
+      const body = { name: name.trim(), parent_id: parentId || undefined };
+      if (dept) {
+        await onUpdate(dept.id, body);
+      } else {
+        await onCreate(body);
+      }
       onClose();
     } finally {
       setSubmitting(false);
     }
   }
 
+  // A department can't be its own parent.
+  const parentOptions = departments.filter((d) => d.id !== dept?.id);
+
   return (
     <Drawer
       onClose={onClose}
       width={420}
-      header={<div style={{ fontSize: 16, fontWeight: 600 }}>Add department</div>}
+      header={<div style={{ fontSize: 16, fontWeight: 600 }}>{isEdit ? "Edit department" : "Add department"}</div>}
       footer={
         <>
           <Btn variant="tertiary" onClick={onClose} style={{ marginRight: "auto" }}>
             Cancel
           </Btn>
-          <Btn variant="primary" icon="plus" disabled={!canSubmit} onClick={() => void submit()}>
-            Create department
+          <Btn variant="primary" icon={isEdit ? "check" : "plus"} disabled={!canSubmit} onClick={() => void submit()}>
+            {isEdit ? "Save changes" : "Create department"}
           </Btn>
         </>
       }
@@ -162,7 +186,7 @@ function AddDeptDrawer({
         <Field label="Parent department">
           <select value={parentId} onChange={(e) => setParentId(e.target.value)} style={controlStyle}>
             <option value="">None</option>
-            {departments.map((d) => (
+            {parentOptions.map((d) => (
               <option key={d.id} value={d.id}>
                 {d.name}
               </option>
@@ -174,19 +198,112 @@ function AddDeptDrawer({
   );
 }
 
+function DeptList({
+  departments,
+  membersOf,
+  nameById,
+  onSelect,
+  onEdit,
+  onDelete,
+}: {
+  departments: Department[];
+  membersOf: (d: Department) => Employee[];
+  nameById: Map<string, string>;
+  onSelect: (d: Department) => void;
+  onEdit: (d: Department) => void;
+  onDelete: (id: string) => void;
+}) {
+  const [sort, toggleSort] = useSort("name");
+  const sorted = sortRows(departments, sort, {
+    name: (d) => d.name,
+    members: (d) => membersOf(d).length,
+    parent: (d) => (d.parent_id ? nameById.get(d.parent_id) ?? "" : ""),
+  });
+  return (
+    <Card style={{ overflow: "hidden" }}>
+      <div style={{ overflowX: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 560 }}>
+          <thead>
+            <tr>
+              {(
+                [
+                  ["Department", "name"],
+                  ["Members", "members"],
+                  ["Parent", "parent"],
+                  ["", null],
+                ] as const
+              ).map(([label, key], i) => (
+                <SortTh key={i} label={label} sortKey={key} sort={sort} onSort={toggleSort} align={key === null ? "right" : "left"} />
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {sorted.map((dep, i) => {
+              const members = membersOf(dep);
+              const color = colorForId(dep.id);
+              return (
+                <tr
+                  key={dep.id}
+                  onClick={() => onSelect(dep)}
+                  style={{ cursor: "pointer", borderBottom: i < sorted.length - 1 ? "1px solid var(--adaptive-100)" : "none" }}
+                  onMouseEnter={(e) => (e.currentTarget.style.background = "var(--adaptive-50)")}
+                  onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+                >
+                  <td style={{ padding: "11px 16px" }}>
+                    <div style={{ display: "flex", alignItems: "center", gap: 11 }}>
+                      <div
+                        style={{
+                          width: 32,
+                          height: 32,
+                          borderRadius: 8,
+                          background: `color-mix(in srgb, ${color} 12%, transparent)`,
+                          display: "flex",
+                          alignItems: "center",
+                          justifyContent: "center",
+                          flexShrink: 0,
+                        }}
+                      >
+                        <Icon name={deptIcon(dep.id)} size={17} color={color} />
+                      </div>
+                      <span style={{ fontWeight: 600, color: "var(--adaptive-900)" }}>{dep.name}</span>
+                    </div>
+                  </td>
+                  <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>{members.length}</td>
+                  <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>
+                    {dep.parent_id ? nameById.get(dep.parent_id) ?? "Unknown" : "—"}
+                  </td>
+                  <td style={{ padding: "11px 16px", textAlign: "right" }}>
+                    <div style={{ display: "inline-flex", gap: 6 }}>
+                      <IconButton icon="pencil" title="Edit" onClick={() => onEdit(dep)} />
+                      <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(dep.id)} />
+                    </div>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </Card>
+  );
+}
+
 export function Departments({
   departments,
   employees,
   onCreate,
+  onUpdate,
   onDelete,
 }: {
   departments: Department[];
   employees: Employee[];
   onCreate: (body: CreateDepartmentRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateDepartmentRequest) => Promise<void>;
   onDelete: (id: string) => void;
 }) {
+  const [layout, setLayout] = useState<"grid" | "list">("grid");
   const [sel, setSel] = useState<Department | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Department | "new" | null>(null);
   const membersOf = (d: Department) => employees.filter((e) => e.department_id === d.id);
   const nameById = new Map(departments.map((d) => [d.id, d.name]));
 
@@ -198,9 +315,12 @@ export function Departments({
           employees.length
         } people`}
         actions={
-          <Btn variant="primary" icon="plus" onClick={() => setAdding(true)}>
-            Add department
-          </Btn>
+          <>
+            <ViewToggle value={layout} onChange={setLayout} />
+            <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
+              Add department
+            </Btn>
+          </>
         }
       />
 
@@ -208,18 +328,22 @@ export function Departments({
         <Card style={{ padding: 28 }}>
           <div style={{ textAlign: "center", color: "var(--adaptive-500)" }}>No departments yet.</div>
         </Card>
+      ) : layout === "list" ? (
+        <DeptList
+          departments={departments}
+          membersOf={membersOf}
+          nameById={nameById}
+          onSelect={setSel}
+          onEdit={(d) => setEditing(d)}
+          onDelete={onDelete}
+        />
       ) : (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(330px, 1fr))", gap: 16 }}>
           {departments.map((dep) => {
             const members = membersOf(dep);
             const color = colorForId(dep.id);
             return (
-              <Card
-                key={dep.id}
-                hover
-                onClick={() => setSel(dep)}
-                style={{ padding: 18, borderTop: `3px solid ${color}` }}
-              >
+              <Card key={dep.id} hover onClick={() => setSel(dep)} style={{ padding: 18, borderTop: `3px solid ${color}` }}>
                 <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
                   <div
                     style={{
@@ -241,6 +365,7 @@ export function Departments({
                       {members.length} {members.length === 1 ? "person" : "people"}
                     </div>
                   </div>
+                  <IconButton icon="pencil" title="Edit" onClick={() => setEditing(dep)} />
                 </div>
                 {dep.parent_id && (
                   <div style={{ marginTop: 12 }}>
@@ -271,16 +396,26 @@ export function Departments({
       )}
 
       {sel && (
-        <DeptDrawer
+        <DeptDetailDrawer
           dept={sel}
           members={membersOf(sel)}
           parentName={sel.parent_id ? nameById.get(sel.parent_id) ?? null : null}
           onClose={() => setSel(null)}
-          onDelete={onDelete}
+          onEdit={() => {
+            setEditing(sel);
+            setSel(null);
+          }}
+          onDelete={() => onDelete(sel.id)}
         />
       )}
-      {adding && (
-        <AddDeptDrawer departments={departments} onClose={() => setAdding(false)} onCreate={onCreate} />
+      {editing && (
+        <DeptFormDrawer
+          dept={editing === "new" ? null : editing}
+          departments={departments}
+          onClose={() => setEditing(null)}
+          onCreate={onCreate}
+          onUpdate={onUpdate}
+        />
       )}
     </div>
   );

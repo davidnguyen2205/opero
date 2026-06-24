@@ -1,5 +1,10 @@
 import { useState } from "react";
-import type { CreateRoleRequest, Employee, Role } from "../api/resources";
+import type {
+  CreateRoleRequest,
+  Employee,
+  Role,
+  UpdateRoleRequest,
+} from "../api/resources";
 import {
   Avatar,
   AvatarStack,
@@ -9,9 +14,13 @@ import {
   DrawerSectionLabel,
   Field,
   Icon,
+  IconButton,
   PageHeader,
+  SortTh,
   colorForId,
   controlStyle,
+  sortRows,
+  useSort,
 } from "../ui";
 import type { Person } from "../ui";
 
@@ -19,16 +28,18 @@ function toPeople(employees: Employee[]): Person[] {
   return employees.map((e) => ({ id: e.id, name: e.full_name }));
 }
 
-function RoleDrawer({
+function RoleDetailDrawer({
   role,
   members,
   onClose,
+  onEdit,
   onDelete,
 }: {
   role: Role;
   members: Employee[];
   onClose: () => void;
-  onDelete: (id: string) => void;
+  onEdit: () => void;
+  onDelete: () => void;
 }) {
   return (
     <Drawer
@@ -47,23 +58,26 @@ function RoleDrawer({
         </>
       }
       footer={
-        <Btn
-          variant="secondary"
-          icon="x"
-          style={{ flex: 1, color: "var(--red-700)", borderColor: "var(--red-200)" }}
-          onClick={() => {
-            onDelete(role.id);
-            onClose();
-          }}
-        >
-          Delete role
-        </Btn>
+        <>
+          <Btn
+            variant="secondary"
+            icon="x"
+            style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
+            onClick={() => {
+              onDelete();
+              onClose();
+            }}
+          >
+            Delete
+          </Btn>
+          <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
+            Edit Role
+          </Btn>
+        </>
       }
     >
       {role.description && (
-        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--adaptive-600)" }}>
-          {role.description}
-        </p>
+        <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--adaptive-600)" }}>{role.description}</p>
       )}
 
       <div>
@@ -126,16 +140,21 @@ function RoleDrawer({
   );
 }
 
-function AddRoleDrawer({
+function RoleFormDrawer({
+  role,
   onClose,
   onCreate,
+  onUpdate,
 }: {
+  role: Role | null;
   onClose: () => void;
   onCreate: (body: CreateRoleRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateRoleRequest) => Promise<void>;
 }) {
-  const [name, setName] = useState("");
-  const [description, setDescription] = useState("");
-  const [permissions, setPermissions] = useState("");
+  const isEdit = Boolean(role);
+  const [name, setName] = useState(role?.name ?? "");
+  const [description, setDescription] = useState(role?.description ?? "");
+  const [permissions, setPermissions] = useState((role?.permissions ?? []).join(", "));
   const [submitting, setSubmitting] = useState(false);
   const canSubmit = name.trim().length > 0 && !submitting;
 
@@ -143,14 +162,19 @@ function AddRoleDrawer({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onCreate({
+      const body = {
         name: name.trim(),
         description: description.trim() || undefined,
         permissions: permissions
           .split(",")
           .map((p) => p.trim())
           .filter((p) => p.length > 0),
-      });
+      };
+      if (role) {
+        await onUpdate(role.id, body);
+      } else {
+        await onCreate(body);
+      }
       onClose();
     } finally {
       setSubmitting(false);
@@ -161,14 +185,14 @@ function AddRoleDrawer({
     <Drawer
       onClose={onClose}
       width={420}
-      header={<div style={{ fontSize: 16, fontWeight: 600 }}>Add role</div>}
+      header={<div style={{ fontSize: 16, fontWeight: 600 }}>{isEdit ? "Edit role" : "Add role"}</div>}
       footer={
         <>
           <Btn variant="tertiary" onClick={onClose} style={{ marginRight: "auto" }}>
             Cancel
           </Btn>
-          <Btn variant="primary" icon="plus" disabled={!canSubmit} onClick={() => void submit()}>
-            Create role
+          <Btn variant="primary" icon={isEdit ? "check" : "plus"} disabled={!canSubmit} onClick={() => void submit()}>
+            {isEdit ? "Save changes" : "Create role"}
           </Btn>
         </>
       }
@@ -201,16 +225,25 @@ export function Roles({
   roles,
   employees,
   onCreate,
+  onUpdate,
   onDelete,
 }: {
   roles: Role[];
   employees: Employee[];
   onCreate: (body: CreateRoleRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateRoleRequest) => Promise<void>;
   onDelete: (id: string) => void;
 }) {
   const [sel, setSel] = useState<Role | null>(null);
-  const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Role | "new" | null>(null);
+  const [sort, toggleSort] = useSort("name");
   const membersOf = (r: Role) => employees.filter((e) => e.role_id === r.id);
+
+  const sorted = sortRows(roles, sort, {
+    name: (r) => r.name,
+    people: (r) => membersOf(r).length,
+    perms: (r) => r.permissions.length,
+  });
 
   return (
     <div style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -218,7 +251,7 @@ export function Roles({
         title="Roles"
         subtitle={`${roles.length} role${roles.length === 1 ? "" : "s"}`}
         actions={
-          <Btn variant="primary" icon="plus" onClick={() => setAdding(true)}>
+          <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
             Add role
           </Btn>
         }
@@ -233,26 +266,21 @@ export function Roles({
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13, minWidth: 720 }}>
               <thead>
-                <tr style={{ background: "var(--adaptive-50)", textAlign: "left" }}>
-                  {["Role", "People", "Permissions", ""].map((h, i) => (
-                    <th
-                      key={i}
-                      style={{
-                        padding: "11px 16px",
-                        fontWeight: 600,
-                        fontSize: 12,
-                        color: "var(--adaptive-500)",
-                        borderBottom: "1px solid var(--adaptive-200)",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {h}
-                    </th>
+                <tr>
+                  {(
+                    [
+                      ["Role", "name"],
+                      ["People", "people"],
+                      ["Permissions", "perms"],
+                      ["", null],
+                    ] as const
+                  ).map(([label, key], i) => (
+                    <SortTh key={i} label={label} sortKey={key} sort={sort} onSort={toggleSort} align={key === null ? "right" : "left"} />
                   ))}
                 </tr>
               </thead>
               <tbody>
-                {roles.map((r, i) => {
+                {sorted.map((r, i) => {
                   const members = membersOf(r);
                   return (
                     <tr
@@ -260,7 +288,7 @@ export function Roles({
                       onClick={() => setSel(r)}
                       style={{
                         cursor: "pointer",
-                        borderBottom: i < roles.length - 1 ? "1px solid var(--adaptive-100)" : "none",
+                        borderBottom: i < sorted.length - 1 ? "1px solid var(--adaptive-100)" : "none",
                       }}
                       onMouseEnter={(e) => (e.currentTarget.style.background = "var(--adaptive-50)")}
                       onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -300,7 +328,10 @@ export function Roles({
                         {r.permissions.length} granted
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <Icon name="chevron" size={15} color="var(--adaptive-300)" />
+                        <div style={{ display: "inline-flex", gap: 6 }}>
+                          <IconButton icon="pencil" title="Edit" onClick={() => setEditing(r)} />
+                          <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(r.id)} />
+                        </div>
                       </td>
                     </tr>
                   );
@@ -312,9 +343,25 @@ export function Roles({
       )}
 
       {sel && (
-        <RoleDrawer role={sel} members={membersOf(sel)} onClose={() => setSel(null)} onDelete={onDelete} />
+        <RoleDetailDrawer
+          role={sel}
+          members={membersOf(sel)}
+          onClose={() => setSel(null)}
+          onEdit={() => {
+            setEditing(sel);
+            setSel(null);
+          }}
+          onDelete={() => onDelete(sel.id)}
+        />
       )}
-      {adding && <AddRoleDrawer onClose={() => setAdding(false)} onCreate={onCreate} />}
+      {editing && (
+        <RoleFormDrawer
+          role={editing === "new" ? null : editing}
+          onClose={() => setEditing(null)}
+          onCreate={onCreate}
+          onUpdate={onUpdate}
+        />
+      )}
     </div>
   );
 }

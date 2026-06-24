@@ -658,6 +658,7 @@ export function App() {
               departments={departments}
               employees={employees}
               onCreate={(body) => runMutation(async () => void (await departmentsApi.create(body)), "Department created.")}
+              onUpdate={(id, body) => runMutation(async () => void (await departmentsApi.update(id, body)), "Department updated.")}
               onDelete={(id) => void runMutation(async () => await departmentsApi.delete(id), "Department deleted.")}
             />
           )}
@@ -666,6 +667,7 @@ export function App() {
               roles={roles}
               employees={employees}
               onCreate={(body) => runMutation(async () => void (await rolesApi.create(body)), "Role created.")}
+              onUpdate={(id, body) => runMutation(async () => void (await rolesApi.update(id, body)), "Role updated.")}
               onDelete={(id) => void runMutation(async () => await rolesApi.delete(id), "Role deleted.")}
             />
           )}
