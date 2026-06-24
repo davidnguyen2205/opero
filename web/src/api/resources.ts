@@ -9,6 +9,12 @@ export type Location = components["schemas"]["Location"];
 export type Role = components["schemas"]["Role"];
 export type Shift = components["schemas"]["Shift"];
 export type LiveViewEntry = components["schemas"]["LiveViewEntry"];
+export type LeaveRequest = components["schemas"]["LeaveRequest"];
+export type LeaveStatus = components["schemas"]["LeaveStatus"];
+export type Tour = components["schemas"]["Tour"];
+export type TourCategory = components["schemas"]["TourCategory"];
+export type CreateTourRequest = components["schemas"]["CreateTourRequest"];
+export type UpdateTourRequest = components["schemas"]["UpdateTourRequest"];
 
 export type CreateDepartmentRequest =
   components["schemas"]["CreateDepartmentRequest"];
@@ -209,6 +215,56 @@ export const liveApi = {
     return unwrap(
       await api.GET("/live", { params: { query: filters } }),
       "Unable to load the live view.",
+    );
+  },
+};
+
+// Manager time-off review: list all leave requests and approve/reject them.
+export const leaveApi = {
+  async list(
+    filters: { status?: LeaveStatus; employee_id?: string } = {},
+  ): Promise<LeaveRequest[]> {
+    return unwrap(
+      await api.GET("/leave", { params: { query: filters } }),
+      "Unable to load leave requests.",
+    );
+  },
+  async approve(id: string): Promise<LeaveRequest> {
+    return unwrap(
+      await api.POST("/leave/{id}/approve", { params: { path: { id } } }),
+      "Unable to approve the request.",
+    );
+  },
+  async reject(id: string): Promise<LeaveRequest> {
+    return unwrap(
+      await api.POST("/leave/{id}/reject", { params: { path: { id } } }),
+      "Unable to reject the request.",
+    );
+  },
+};
+
+export const toursApi = {
+  async list(
+    filters: { category?: TourCategory; active?: boolean } = {},
+  ): Promise<Tour[]> {
+    return unwrap(
+      await api.GET("/tours", { params: { query: filters } }),
+      "Unable to load tours.",
+    );
+  },
+  async create(body: CreateTourRequest): Promise<Tour> {
+    return unwrap(await api.POST("/tours", { body }), "Unable to create tour.");
+  },
+  async update(id: string, body: UpdateTourRequest): Promise<Tour> {
+    return unwrap(
+      await api.PATCH("/tours/{id}", { params: { path: { id } }, body }),
+      "Unable to update tour.",
+    );
+  },
+  async delete(id: string): Promise<void> {
+    await unwrapEmpty(
+      await api.DELETE("/tours/{id}", { params: { path: { id } } }),
+      "Unable to delete tour.",
     );
   },
 };

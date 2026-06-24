@@ -53,6 +53,29 @@ type Employee struct {
 	RoleID         pgtype.UUID
 }
 
+type LeaveBalance struct {
+	ID           uuid.UUID
+	EmployeeID   uuid.UUID
+	Year         int32
+	EntitledDays int32
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+}
+
+type LeaveRequest struct {
+	ID         uuid.UUID
+	EmployeeID uuid.UUID
+	Type       string
+	StartDate  time.Time
+	EndDate    time.Time
+	Note       *string
+	Status     string
+	ReviewedBy pgtype.UUID
+	ReviewedAt pgtype.Timestamptz
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+}
+
 type Location struct {
 	ID        uuid.UUID
 	Name      string
@@ -82,4 +105,23 @@ type Shift struct {
 	Status     string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+}
+
+type Tour struct {
+	ID             uuid.UUID
+	Name           string
+	Category       string
+	MeetingPoint   *string
+	DurationMin    int32
+	MaxGuests      int32
+	GuidesNeeded   int32
+	DriversNeeded  int32
+	DepartureTimes []string
+	PriceCents     int32
+	Rating         *float64
+	Active         bool
+	Color          *string
+	Description    *string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
