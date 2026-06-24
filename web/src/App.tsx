@@ -338,7 +338,19 @@ function Sidebar({
   );
 }
 
-function TopBar({ view, loading, onRefresh }: { view: View; loading: boolean; onRefresh: () => void }) {
+function TopBar({
+  view,
+  crumb,
+  onCrumbRoot,
+  loading,
+  onRefresh,
+}: {
+  view: View;
+  crumb?: string | null;
+  onCrumbRoot?: () => void;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   return (
     <header
       style={{
@@ -356,7 +368,28 @@ function TopBar({ view, loading, onRefresh }: { view: View; loading: boolean; on
       <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--adaptive-500)" }}>
         <span>{PEOPLE_VIEWS.includes(view) ? "People" : "Operations"}</span>
         <Icon name="chevron" size={14} color="var(--adaptive-300)" />
-        <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{TITLES[view]}</span>
+        {crumb ? (
+          <>
+            <button
+              onClick={onCrumbRoot}
+              style={{
+                border: 0,
+                background: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: 13,
+                color: "var(--adaptive-500)",
+              }}
+            >
+              {TITLES[view]}
+            </button>
+            <Icon name="chevron" size={14} color="var(--adaptive-300)" />
+            <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{crumb}</span>
+          </>
+        ) : (
+          <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{TITLES[view]}</span>
+        )}
       </div>
       <div style={{ flex: 1 }} />
       <div
@@ -587,7 +620,13 @@ export function App() {
         onSignOut={signOut}
       />
       <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "var(--background)" }}>
-        <TopBar view={view} loading={loading} onRefresh={() => void loadData()} />
+        <TopBar
+          view={view}
+          crumb={view === "people" && selectedEmployee ? selectedEmployee.full_name : null}
+          onCrumbRoot={() => setSelectedEmployee(null)}
+          loading={loading}
+          onRefresh={() => void loadData()}
+        />
         <div style={{ flex: 1, overflow: "auto", background: "var(--background)" }}>
           {view === "live" && (
             <LiveView entries={live} locationNames={locationNames} onRefresh={() => void loadData()} loading={loading} />
@@ -633,12 +672,16 @@ export function App() {
                 employee={selectedEmployee}
                 shifts={shifts}
                 live={live}
+                leaveRequests={leaveRequests}
                 locationNames={locationNames}
                 departmentName={
                   selectedEmployee.department_id ? departmentNames.get(selectedEmployee.department_id) ?? null : null
                 }
                 roleName={selectedEmployee.role_id ? roleNames.get(selectedEmployee.role_id) ?? null : null}
-                onBack={() => setSelectedEmployee(null)}
+                onNavigate={(v) => {
+                  setSelectedEmployee(null);
+                  setView(v);
+                }}
               />
             ) : (
               <People

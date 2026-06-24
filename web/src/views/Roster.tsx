@@ -137,56 +137,70 @@ function ShiftChip({
           </span>
         )}
       </span>
-      <div style={{ display: "flex", gap: 8, marginTop: 2 }}>
+      <div style={{ display: "flex", gap: 4, marginTop: 4 }}>
         {draft && (
-          <button
+          <ChipIconButton
+            icon="check"
+            title="Publish"
+            color="var(--green-600)"
+            borderColor="var(--green-200)"
+            background="var(--green-50)"
             onClick={() => onPublish(shift.id)}
-            style={{
-              border: 0,
-              background: "transparent",
-              color: "var(--adaptive-600)",
-              fontSize: 11,
-              fontWeight: 700,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              padding: 0,
-            }}
-          >
-            Publish
-          </button>
+          />
         )}
-        <button
-          onClick={() => onEdit(shift)}
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--adaptive-600)",
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            padding: 0,
-          }}
-        >
-          Edit
-        </button>
-        <button
+        <ChipIconButton icon="pencil" title="Edit" onClick={() => onEdit(shift)} />
+        <ChipIconButton
+          icon="x"
+          title="Delete"
+          color="var(--red-600)"
+          borderColor="var(--red-200)"
+          background="var(--red-50)"
           onClick={() => onDelete(shift.id)}
-          style={{
-            border: 0,
-            background: "transparent",
-            color: "var(--adaptive-600)",
-            fontSize: 11,
-            fontWeight: 700,
-            cursor: "pointer",
-            fontFamily: "inherit",
-            padding: 0,
-          }}
-        >
-          Delete
-        </button>
+        />
       </div>
     </div>
+  );
+}
+
+// Compact (22px) icon button sized for the roster shift chips.
+function ChipIconButton({
+  icon,
+  title,
+  onClick,
+  color = "var(--adaptive-600)",
+  borderColor = "var(--adaptive-200)",
+  background = "var(--card)",
+}: {
+  icon: "check" | "pencil" | "x";
+  title: string;
+  onClick: () => void;
+  color?: string;
+  borderColor?: string;
+  background?: string;
+}) {
+  return (
+    <button
+      title={title}
+      aria-label={title}
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
+      style={{
+        width: 22,
+        height: 22,
+        borderRadius: 5,
+        border: `1px solid ${borderColor}`,
+        background,
+        cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        padding: 0,
+      }}
+    >
+      <Icon name={icon} size={12} color={color} />
+    </button>
   );
 }
 

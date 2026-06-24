@@ -295,7 +295,16 @@ export function People({
             <Avatar person={{ id: s.id, name: s.full_name }} size={32} />
             <div>
               <div style={{ fontWeight: 600, color: "var(--adaptive-900)" }}>{s.full_name}</div>
-              {s.title && <div style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>{s.title}</div>}
+              {(() => {
+                // Title is a distinct, more-specific job title — shown only when
+                // set and different from the role (role has its own column, so we
+                // never duplicate it here).
+                const roleName = s.role_id ? roleNames.get(s.role_id) : null;
+                const title = s.title?.trim();
+                return title && title !== roleName ? (
+                  <div style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>{title}</div>
+                ) : null;
+              })()}
             </div>
           </button>
         </td>
