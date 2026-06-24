@@ -194,6 +194,7 @@ export function People({
   roles,
   departmentNames,
   roleNames,
+  onOpen,
   onCreate,
   onUpdate,
   onDelete,
@@ -203,6 +204,7 @@ export function People({
   roles: Role[];
   departmentNames: Map<string, string>;
   roleNames: Map<string, string>;
+  onOpen: (employee: Employee) => void;
   onCreate: (body: CreateEmployeeRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateEmployeeRequest) => Promise<void>;
   onDelete: (id: string) => void;
@@ -261,13 +263,26 @@ export function People({
         onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
       >
         <td style={{ padding: "10px 16px" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <button
+            onClick={() => onOpen(s)}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              border: 0,
+              background: "none",
+              padding: 0,
+              cursor: "pointer",
+              fontFamily: "inherit",
+              textAlign: "left",
+            }}
+          >
             <Avatar person={{ id: s.id, name: s.full_name }} size={32} />
             <div>
               <div style={{ fontWeight: 600, color: "var(--adaptive-900)" }}>{s.full_name}</div>
               {s.title && <div style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>{s.title}</div>}
             </div>
-          </div>
+          </button>
         </td>
         <td style={{ padding: "10px 16px", color: "var(--adaptive-700)" }}>
           {s.role_id ? roleNames.get(s.role_id) ?? "Unknown" : "—"}

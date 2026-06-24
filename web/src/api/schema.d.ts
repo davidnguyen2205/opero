@@ -424,6 +424,176 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/me/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the authenticated employee's own leave requests.
+         * @description Field-facing: leave requests for the employee linked to the caller's login (resolved from the token), newest first. Empty list if the caller has no linked employee record.
+         */
+        get: operations["listMyLeave"];
+        put?: never;
+        /**
+         * Submit a time-off request (field staff).
+         * @description Creates a pending leave request for the employee linked to the caller's login. Managers review it via the /leave endpoints.
+         */
+        post: operations["createMyLeave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/me/leave/balance": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The authenticated employee's leave balance for the current year.
+         * @description Entitled days come from the employee's balance row (default applies when none is set); used days are computed from approved requests in the year.
+         */
+        get: operations["getMyLeaveBalance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leave": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List leave requests (manager).
+         * @description All leave requests in the tenant, newest first, optionally filtered by status or employee.
+         */
+        get: operations["listLeave"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leave/{id}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Approve a leave request (manager).
+         * @description Marks a pending request approved and records the reviewing user and time. Idempotent on an already-approved request.
+         */
+        post: operations["approveLeave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/leave/{id}/reject": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Reject a leave request (manager).
+         * @description Marks a pending request rejected and records the reviewing user and time. Idempotent on an already-rejected request.
+         */
+        post: operations["rejectLeave"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List tours in the catalog.
+         * @description The tenant's tour catalog, optionally filtered by category or active flag. Ordered by name.
+         */
+        get: operations["listTours"];
+        put?: never;
+        /** Create a tour. */
+        post: operations["createTour"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/tours/{id}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        /** Get a tour by id. */
+        get: operations["getTour"];
+        put?: never;
+        post?: never;
+        /** Delete a tour. */
+        delete: operations["deleteTour"];
+        options?: never;
+        head?: never;
+        /** Update a tour. */
+        patch: operations["updateTour"];
+        trace?: never;
+    };
+    "/me/stats": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The authenticated employee's personal activity stats.
+         * @description Computed (not stored) from the caller's shifts and attendance: shifts this calendar month, hours worked this week (from completed check-in/out pairs), on-time rate (check-in at or before the shift start over shifts with a check-in), and tenure in days (from hired_at). Read-only; this is a convenience aggregate for the field-app profile, not analytics infra.
+         */
+        get: operations["getMyStats"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -766,6 +936,145 @@ export interface components {
             check_in_at?: string | null;
             /** Format: date-time */
             check_out_at?: string | null;
+        };
+        /**
+         * @description Kind of leave being requested.
+         * @enum {string}
+         */
+        LeaveType: "holiday" | "sick" | "personal";
+        /**
+         * @description Review state of a leave request.
+         * @enum {string}
+         */
+        LeaveStatus: "pending" | "approved" | "rejected";
+        LeaveRequest: {
+            /** Format: uuid */
+            id: string;
+            /** Format: uuid */
+            employee_id: string;
+            type: components["schemas"]["LeaveType"];
+            /** Format: date */
+            start_date: string;
+            /** Format: date */
+            end_date: string;
+            note?: string | null;
+            status: components["schemas"]["LeaveStatus"];
+            /**
+             * Format: uuid
+             * @description Control-plane user id of the manager who reviewed it (no FK; different database).
+             */
+            reviewed_by?: string | null;
+            /** Format: date-time */
+            reviewed_at?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateLeaveRequest: {
+            type: components["schemas"]["LeaveType"];
+            /** Format: date */
+            start_date: string;
+            /**
+             * Format: date
+             * @description Inclusive end date; must be on or after start_date.
+             */
+            end_date: string;
+            note?: string | null;
+        };
+        LeaveBalance: {
+            year: number;
+            /** @description Days the employee is entitled to this year (a default applies if unset). */
+            entitled_days: number;
+            /** @description Days consumed by approved requests in the year (calendar days, inclusive). */
+            used_days: number;
+            remaining_days: number;
+        };
+        MyStats: {
+            shifts_this_month: number;
+            /**
+             * Format: double
+             * @description Hours from completed check-in/out pairs since the start of the current week (Monday, UTC).
+             */
+            hours_this_week: number;
+            /** @description Percent of shifts-with-a-check-in where check-in was at or before the shift start (0–100). 100 when there are none. */
+            on_time_pct: number;
+            /** @description Days since hired_at, or null when hired_at is unset. */
+            tenure_days?: number | null;
+        };
+        /**
+         * @description Tour category.
+         * @enum {string}
+         */
+        TourCategory: "walking" | "day_trip" | "food" | "driving" | "evening";
+        Tour: {
+            /** Format: uuid */
+            id: string;
+            name: string;
+            category: components["schemas"]["TourCategory"];
+            meeting_point?: string | null;
+            /** @description Tour duration in minutes. */
+            duration_min: number;
+            max_guests: number;
+            guides_needed: number;
+            drivers_needed: number;
+            /** @description Daily departure times as HH:MM strings. */
+            departure_times: string[];
+            /** @description Price per guest in minor currency units (e.g. euro cents). */
+            price_cents: number;
+            /**
+             * Format: double
+             * @description Average rating 0–5, or null when unrated.
+             */
+            rating?: number | null;
+            /** @description Whether the tour is bookable and schedulable. */
+            active: boolean;
+            /** @description Accent colour (hex) for UI. */
+            color?: string | null;
+            description?: string | null;
+            /** Format: date-time */
+            created_at: string;
+            /** Format: date-time */
+            updated_at: string;
+        };
+        CreateTourRequest: {
+            name: string;
+            category: components["schemas"]["TourCategory"];
+            meeting_point?: string | null;
+            /** @default 120 */
+            duration_min: number;
+            /** @default 10 */
+            max_guests: number;
+            /** @default 1 */
+            guides_needed: number;
+            /** @default 0 */
+            drivers_needed: number;
+            departure_times?: string[];
+            /** @default 0 */
+            price_cents: number;
+            /** Format: double */
+            rating?: number | null;
+            /** @default true */
+            active: boolean;
+            color?: string | null;
+            description?: string | null;
+        };
+        /** @description PATCH semantics — only provided fields change. */
+        UpdateTourRequest: {
+            name?: string;
+            category?: components["schemas"]["TourCategory"];
+            meeting_point?: string | null;
+            duration_min?: number;
+            max_guests?: number;
+            guides_needed?: number;
+            drivers_needed?: number;
+            departure_times?: string[];
+            price_cents?: number;
+            /** Format: double */
+            rating?: number | null;
+            active?: boolean;
+            color?: string | null;
+            description?: string | null;
         };
     };
     responses: {
@@ -1725,6 +2034,294 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["LiveViewEntry"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listMyLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's leave requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveRequest"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createMyLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateLeaveRequest"];
+            };
+        };
+        responses: {
+            /** @description Leave request created (status pending). */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getMyLeaveBalance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's leave balance. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveBalance"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    listLeave: {
+        parameters: {
+            query?: {
+                status?: components["schemas"]["LeaveStatus"];
+                employee_id?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Leave requests. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveRequest"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    approveLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated leave request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    rejectLeave: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The updated leave request. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LeaveRequest"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    listTours: {
+        parameters: {
+            query?: {
+                category?: components["schemas"]["TourCategory"];
+                active?: boolean;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tenant's tours. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"][];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    createTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateTourRequest"];
+            };
+        };
+        responses: {
+            /** @description Tour created. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    getTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The tour. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    deleteTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Deleted. */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    updateTour: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                id: components["parameters"]["IdParam"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateTourRequest"];
+            };
+        };
+        responses: {
+            /** @description Updated tour. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Tour"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    getMyStats: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The caller's stats. Zeroes when there is no linked employee or no data. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MyStats"];
                 };
             };
             401: components["responses"]["Unauthorized"];

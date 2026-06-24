@@ -4,19 +4,23 @@ import {
   authApi,
   departmentsApi,
   employeesApi,
+  leaveApi,
   liveApi,
   locationsApi,
   rolesApi,
   setAuthToken,
   shiftsApi,
+  toursApi,
   type AuthResponse,
   type CurrentUserResponse,
   type Department,
   type Employee,
+  type LeaveRequest,
   type LiveViewEntry,
   type Location,
   type Role,
   type Shift,
+  type Tour,
 } from "./api/resources";
 import { Icon, humanize, initials } from "./ui";
 import type { IconName } from "./ui";
@@ -27,8 +31,11 @@ import { People } from "./views/People";
 import { Departments } from "./views/Departments";
 import { Roles } from "./views/Roles";
 import { Locations } from "./views/Locations";
+import { Tours } from "./views/Tours";
+import { TimeOff } from "./views/TimeOff";
+import { EmployeeDetail } from "./views/EmployeeDetail";
 
-type View = "live" | "roster" | "locations" | "people" | "departments" | "roles";
+type View = "live" | "roster" | "tours" | "locations" | "people" | "departments" | "roles" | "timeoff";
 
 const NAV: { section: string; items: { id: View; label: string; icon: IconName; badge?: string }[] }[] = [
   {
@@ -36,6 +43,7 @@ const NAV: { section: string; items: { id: View; label: string; icon: IconName; 
     items: [
       { id: "live", label: "Live View", icon: "activity", badge: "LIVE" },
       { id: "roster", label: "Roster", icon: "calendar" },
+      { id: "tours", label: "Tours", icon: "map" },
       { id: "locations", label: "Locations", icon: "pin" },
     ],
   },
@@ -45,6 +53,7 @@ const NAV: { section: string; items: { id: View; label: string; icon: IconName; 
       { id: "people", label: "Directory", icon: "users" },
       { id: "departments", label: "Departments", icon: "briefcase" },
       { id: "roles", label: "Roles", icon: "route" },
+      { id: "timeoff", label: "Time Off", icon: "calendar" },
     ],
   },
 ];
@@ -52,11 +61,15 @@ const NAV: { section: string; items: { id: View; label: string; icon: IconName; 
 const TITLES: Record<View, string> = {
   live: "Live View",
   roster: "Roster",
+  tours: "Tours",
   locations: "Locations",
   people: "Directory",
   departments: "Departments",
   roles: "Roles",
+  timeoff: "Time Off",
 };
+
+const PEOPLE_VIEWS: View[] = ["people", "departments", "roles", "timeoff"];
 
 function OperoMark({ size = 28 }: { size?: number }) {
   return (
@@ -341,7 +354,7 @@ function TopBar({ view, loading, onRefresh }: { view: View; loading: boolean; on
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--adaptive-500)" }}>
-        <span>{["people", "departments", "roles"].includes(view) ? "People" : "Operations"}</span>
+        <span>{PEOPLE_VIEWS.includes(view) ? "People" : "Operations"}</span>
         <Icon name="chevron" size={14} color="var(--adaptive-300)" />
         <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{TITLES[view]}</span>
       </div>
@@ -467,6 +480,9 @@ export function App() {
   const [roles, setRoles] = useState<Role[]>([]);
   const [shifts, setShifts] = useState<Shift[]>([]);
   const [live, setLive] = useState<LiveViewEntry[]>([]);
+  const [tours, setTours] = useState<Tour[]>([]);
+  const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
+  const [selectedEmployee, setSelectedEmployee] = useState<Employee | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
@@ -476,7 +492,7 @@ export function App() {
     setLoading(true);
     setError(null);
     try {
-      const [me, deps, emps, locs, roleList, shiftList, liveList] = await Promise.all([
+      const [me, deps, emps, locs, roleList, shiftList, liveList, tourList, leaveList] = await Promise.all([
         authApi.me(),
         departmentsApi.list(),
         employeesApi.list(),
@@ -484,6 +500,8 @@ export function App() {
         rolesApi.list(),
         shiftsApi.list(),
         liveApi.list(),
+        toursApi.list(),
+        leaveApi.list(),
       ]);
       setCurrentUser(me);
       setDepartments(deps);
@@ -492,6 +510,8 @@ export function App() {
       setRoles(roleList);
       setShifts(shiftList);
       setLive(liveList);
+      setTours(tourList);
+      setLeaveRequests(leaveList);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unable to load data.");
     } finally {
@@ -523,6 +543,9 @@ export function App() {
     setRoles([]);
     setShifts([]);
     setLive([]);
+    setTours([]);
+    setLeaveRequests([]);
+    setSelectedEmployee(null);
     setNotice(null);
     setError(null);
   }
@@ -554,7 +577,10 @@ export function App() {
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--background)" }}>
       <Sidebar
         active={view}
-        onSelect={setView}
+        onSelect={(v) => {
+          setSelectedEmployee(null);
+          setView(v);
+        }}
         tenantName={tenantName}
         userEmail={userEmail}
         userRole={userRole}
@@ -586,6 +612,14 @@ export function App() {
               }
             />
           )}
+          {view === "tours" && (
+            <Tours
+              tours={tours}
+              onCreate={(body) => runMutation(async () => void (await toursApi.create(body)), "Tour created.")}
+              onUpdate={(id, body) => runMutation(async () => void (await toursApi.update(id, body)), "Tour updated.")}
+              onDelete={(id) => void runMutation(async () => await toursApi.delete(id), "Tour deleted.")}
+            />
+          )}
           {view === "locations" && (
             <Locations
               locations={locations}
@@ -593,18 +627,32 @@ export function App() {
               onDelete={(id) => void runMutation(async () => await locationsApi.delete(id), "Location deleted.")}
             />
           )}
-          {view === "people" && (
-            <People
-              employees={employees}
-              departments={departments}
-              roles={roles}
-              departmentNames={departmentNames}
-              roleNames={roleNames}
-              onCreate={(body) => runMutation(async () => void (await employeesApi.create(body)), "Employee added.")}
-              onUpdate={(id, body) => runMutation(async () => void (await employeesApi.update(id, body)), "Employee updated.")}
-              onDelete={(id) => void runMutation(async () => await employeesApi.delete(id), "Employee deleted.")}
-            />
-          )}
+          {view === "people" &&
+            (selectedEmployee ? (
+              <EmployeeDetail
+                employee={selectedEmployee}
+                shifts={shifts}
+                live={live}
+                locationNames={locationNames}
+                departmentName={
+                  selectedEmployee.department_id ? departmentNames.get(selectedEmployee.department_id) ?? null : null
+                }
+                roleName={selectedEmployee.role_id ? roleNames.get(selectedEmployee.role_id) ?? null : null}
+                onBack={() => setSelectedEmployee(null)}
+              />
+            ) : (
+              <People
+                employees={employees}
+                departments={departments}
+                roles={roles}
+                departmentNames={departmentNames}
+                roleNames={roleNames}
+                onOpen={setSelectedEmployee}
+                onCreate={(body) => runMutation(async () => void (await employeesApi.create(body)), "Employee added.")}
+                onUpdate={(id, body) => runMutation(async () => void (await employeesApi.update(id, body)), "Employee updated.")}
+                onDelete={(id) => void runMutation(async () => await employeesApi.delete(id), "Employee deleted.")}
+              />
+            ))}
           {view === "departments" && (
             <Departments
               departments={departments}
@@ -619,6 +667,14 @@ export function App() {
               employees={employees}
               onCreate={(body) => runMutation(async () => void (await rolesApi.create(body)), "Role created.")}
               onDelete={(id) => void runMutation(async () => await rolesApi.delete(id), "Role deleted.")}
+            />
+          )}
+          {view === "timeoff" && (
+            <TimeOff
+              requests={leaveRequests}
+              employees={employees}
+              onApprove={(id) => void runMutation(async () => void (await leaveApi.approve(id)), "Request approved.")}
+              onReject={(id) => void runMutation(async () => void (await leaveApi.reject(id)), "Request rejected.")}
             />
           )}
         </div>
