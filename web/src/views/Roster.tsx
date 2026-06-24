@@ -6,6 +6,7 @@ import type {
   Employee,
   Location,
   Shift,
+  UpdateShiftRequest,
 } from "../api/resources";
 import {
   Avatar,
@@ -71,12 +72,14 @@ function ShiftChip({
   label,
   color,
   onPublish,
+  onEdit,
   onDelete,
 }: {
   shift: Shift;
   label: string;
   color: string;
   onPublish: (id: string) => void;
+  onEdit: (shift: Shift) => void;
   onDelete: (id: string) => void;
 }) {
   const draft = shift.status === "draft";
@@ -153,6 +156,21 @@ function ShiftChip({
           </button>
         )}
         <button
+          onClick={() => onEdit(shift)}
+          style={{
+            border: 0,
+            background: "transparent",
+            color: "var(--adaptive-600)",
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            fontFamily: "inherit",
+            padding: 0,
+          }}
+        >
+          Edit
+        </button>
+        <button
           onClick={() => onDelete(shift.id)}
           style={{
             border: 0,
@@ -172,31 +190,40 @@ function ShiftChip({
   );
 }
 
-function AddShiftDrawer({
+function ShiftDrawer({
+  shift,
   employees,
   locations,
   defaultEmployeeId,
   defaultDay,
   onClose,
   onCreate,
+  onUpdate,
 }: {
+  shift?: Shift;
   employees: Employee[];
   locations: Location[];
   defaultEmployeeId: string;
   defaultDay: Date | null;
   onClose: () => void;
   onCreate: (body: CreateShiftRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateShiftRequest) => Promise<void>;
 }) {
+  const isEdit = Boolean(shift);
   const base = defaultDay ? new Date(defaultDay) : new Date();
   base.setHours(10, 0, 0, 0);
   const end = new Date(base);
   end.setHours(base.getHours() + 3);
 
-  const [employeeId, setEmployeeId] = useState(defaultEmployeeId || employees[0]?.id || "");
-  const [locationId, setLocationId] = useState("");
-  const [startsAt, setStartsAt] = useState(toLocalInput(base));
-  const [endsAt, setEndsAt] = useState(toLocalInput(end));
-  const [notes, setNotes] = useState("");
+  const [employeeId, setEmployeeId] = useState(
+    shift?.employee_id ?? defaultEmployeeId ?? employees[0]?.id ?? "",
+  );
+  const [locationId, setLocationId] = useState(shift?.location_id ?? "");
+  const [startsAt, setStartsAt] = useState(
+    shift ? toLocalInput(new Date(shift.starts_at)) : toLocalInput(base),
+  );
+  const [endsAt, setEndsAt] = useState(shift ? toLocalInput(new Date(shift.ends_at)) : toLocalInput(end));
+  const [notes, setNotes] = useState(shift?.notes ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = Boolean(employeeId && startsAt && endsAt) && !submitting;
@@ -205,13 +232,18 @@ function AddShiftDrawer({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onCreate({
+      const body = {
         employee_id: employeeId,
         location_id: locationId || undefined,
         starts_at: new Date(startsAt).toISOString(),
         ends_at: new Date(endsAt).toISOString(),
         notes: notes.trim() || undefined,
-      });
+      };
+      if (shift) {
+        await onUpdate(shift.id, body);
+      } else {
+        await onCreate(body);
+      }
       onClose();
     } finally {
       setSubmitting(false);
@@ -222,14 +254,14 @@ function AddShiftDrawer({
     <Drawer
       onClose={onClose}
       width={420}
-      header={<div style={{ fontSize: 16, fontWeight: 600 }}>Add shift</div>}
+      header={<div style={{ fontSize: 16, fontWeight: 600 }}>{isEdit ? "Edit shift" : "Add shift"}</div>}
       footer={
         <>
           <Btn variant="tertiary" onClick={onClose} style={{ marginRight: "auto" }}>
             Cancel
           </Btn>
-          <Btn variant="primary" icon="plus" disabled={!canSubmit} onClick={() => void submit()}>
-            Add draft shift
+          <Btn variant="primary" icon={isEdit ? "check" : "plus"} disabled={!canSubmit} onClick={() => void submit()}>
+            {isEdit ? "Save changes" : "Add draft shift"}
           </Btn>
         </>
       }
@@ -287,22 +319,24 @@ function AddShiftDrawer({
             style={{ ...FIELD, minHeight: 80, padding: "8px 10px", resize: "vertical" }}
           />
         </div>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            padding: "10px 12px",
-            background: "var(--primary-50)",
-            border: "1px solid var(--primary-200)",
-            borderRadius: 7,
-            fontSize: 12.5,
-            color: "var(--primary-800)",
-          }}
-        >
-          <Icon name="alert" size={15} color="var(--primary-600)" />
-          New shifts are added as <strong style={{ fontWeight: 700 }}>drafts</strong> until you publish.
-        </div>
+        {!isEdit && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              padding: "10px 12px",
+              background: "var(--primary-50)",
+              border: "1px solid var(--primary-200)",
+              borderRadius: 7,
+              fontSize: 12.5,
+              color: "var(--primary-800)",
+            }}
+          >
+            <Icon name="alert" size={15} color="var(--primary-600)" />
+            New shifts are added as <strong style={{ fontWeight: 700 }}>drafts</strong> until you publish.
+          </div>
+        )}
       </div>
     </Drawer>
   );
@@ -317,6 +351,7 @@ export function Roster({
   shifts,
   locationNames,
   onCreate,
+  onUpdate,
   onDelete,
   onPublish,
   onPublishMany,
@@ -327,12 +362,14 @@ export function Roster({
   shifts: Shift[];
   locationNames: Map<string, string>;
   onCreate: (body: CreateShiftRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateShiftRequest) => Promise<void>;
   onDelete: (id: string) => void;
   onPublish: (id: string) => void;
   onPublishMany: (ids: string[]) => Promise<void>;
 }) {
   const [weekOffset, setWeekOffset] = useState(0);
   const [adding, setAdding] = useState<{ employeeId: string; day: Date | null } | null>(null);
+  const [editingShift, setEditingShift] = useState<Shift | null>(null);
 
   const anchor = useMemo(() => {
     const d = new Date();
@@ -606,6 +643,7 @@ export function Roster({
                                     label={shiftLabel(s)}
                                     color={colorForId(s.location_id ?? s.id)}
                                     onPublish={onPublish}
+                                    onEdit={setEditingShift}
                                     onDelete={onDelete}
                                   />
                                 ))
@@ -665,14 +703,19 @@ export function Roster({
         </div>
       )}
 
-      {adding && (
-        <AddShiftDrawer
+      {(adding || editingShift) && (
+        <ShiftDrawer
+          shift={editingShift ?? undefined}
           employees={roster}
           locations={locations}
-          defaultEmployeeId={adding.employeeId}
-          defaultDay={adding.day}
-          onClose={() => setAdding(null)}
+          defaultEmployeeId={adding?.employeeId ?? ""}
+          defaultDay={adding?.day ?? null}
+          onClose={() => {
+            setAdding(null);
+            setEditingShift(null);
+          }}
           onCreate={onCreate}
+          onUpdate={onUpdate}
         />
       )}
     </div>

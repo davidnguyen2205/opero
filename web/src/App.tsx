@@ -574,6 +574,7 @@ export function App() {
               shifts={shifts}
               locationNames={locationNames}
               onCreate={(body) => runMutation(async () => void (await shiftsApi.create(body)), "Draft shift added.")}
+              onUpdate={(id, body) => runMutation(async () => void (await shiftsApi.update(id, body)), "Shift updated.")}
               onDelete={(id) => void runMutation(async () => await shiftsApi.delete(id), "Shift deleted.")}
               onPublish={(id) => void runMutation(async () => void (await shiftsApi.publish(id)), "Shift published.")}
               onPublishMany={(ids) =>
@@ -600,6 +601,7 @@ export function App() {
               departmentNames={departmentNames}
               roleNames={roleNames}
               onCreate={(body) => runMutation(async () => void (await employeesApi.create(body)), "Employee added.")}
+              onUpdate={(id, body) => runMutation(async () => void (await employeesApi.update(id, body)), "Employee updated.")}
               onDelete={(id) => void runMutation(async () => await employeesApi.delete(id), "Employee deleted.")}
             />
           )}

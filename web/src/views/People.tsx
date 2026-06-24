@@ -5,6 +5,7 @@ import type {
   Department,
   Employee,
   Role,
+  UpdateEmployeeRequest,
 } from "../api/resources";
 import {
   Avatar,
@@ -34,26 +35,33 @@ const TYPE_TONE: Record<Employee["employment_type"], ChipTone> = {
   seasonal: "orange",
 };
 
-function AddMemberDrawer({
+function MemberDrawer({
+  employee,
   departments,
   roles,
   onClose,
   onCreate,
+  onUpdate,
 }: {
+  employee?: Employee;
   departments: Department[];
   roles: Role[];
   onClose: () => void;
   onCreate: (body: CreateEmployeeRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateEmployeeRequest) => Promise<void>;
 }) {
-  const [fullName, setFullName] = useState("");
-  const [departmentId, setDepartmentId] = useState("");
-  const [roleId, setRoleId] = useState("");
-  const [employmentType, setEmploymentType] = useState<Employee["employment_type"]>("full_time");
-  const [status, setStatus] = useState<Employee["status"]>("active");
-  const [title, setTitle] = useState("");
-  const [email, setEmail] = useState("");
-  const [phone, setPhone] = useState("");
-  const [hiredAt, setHiredAt] = useState("");
+  const isEdit = Boolean(employee);
+  const [fullName, setFullName] = useState(employee?.full_name ?? "");
+  const [departmentId, setDepartmentId] = useState(employee?.department_id ?? "");
+  const [roleId, setRoleId] = useState(employee?.role_id ?? "");
+  const [employmentType, setEmploymentType] = useState<Employee["employment_type"]>(
+    employee?.employment_type ?? "full_time",
+  );
+  const [status, setStatus] = useState<Employee["status"]>(employee?.status ?? "active");
+  const [title, setTitle] = useState(employee?.title ?? "");
+  const [email, setEmail] = useState(employee?.email ?? "");
+  const [phone, setPhone] = useState(employee?.phone ?? "");
+  const [hiredAt, setHiredAt] = useState(employee?.hired_at ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = fullName.trim().length > 0 && !submitting;
@@ -62,7 +70,9 @@ function AddMemberDrawer({
     if (!canSubmit) return;
     setSubmitting(true);
     try {
-      await onCreate({
+      // PATCH in v1 can't clear fields back to null, so empties are omitted
+      // rather than sent — same body shape for create and update.
+      const body = {
         full_name: fullName.trim(),
         department_id: departmentId || undefined,
         role_id: roleId || undefined,
@@ -72,7 +82,12 @@ function AddMemberDrawer({
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         hired_at: hiredAt || undefined,
-      });
+      };
+      if (employee) {
+        await onUpdate(employee.id, body);
+      } else {
+        await onCreate(body);
+      }
       onClose();
     } finally {
       setSubmitting(false);
@@ -83,14 +98,14 @@ function AddMemberDrawer({
     <Drawer
       onClose={onClose}
       width={420}
-      header={<div style={{ fontSize: 16, fontWeight: 600 }}>Add member</div>}
+      header={<div style={{ fontSize: 16, fontWeight: 600 }}>{isEdit ? "Edit member" : "Add member"}</div>}
       footer={
         <>
           <Btn variant="tertiary" onClick={onClose} style={{ marginRight: "auto" }}>
             Cancel
           </Btn>
-          <Btn variant="primary" icon="plus" disabled={!canSubmit} onClick={() => void submit()}>
-            Add member
+          <Btn variant="primary" icon={isEdit ? "check" : "plus"} disabled={!canSubmit} onClick={() => void submit()}>
+            {isEdit ? "Save changes" : "Add member"}
           </Btn>
         </>
       }
@@ -180,6 +195,7 @@ export function People({
   departmentNames,
   roleNames,
   onCreate,
+  onUpdate,
   onDelete,
 }: {
   employees: Employee[];
@@ -188,11 +204,13 @@ export function People({
   departmentNames: Map<string, string>;
   roleNames: Map<string, string>;
   onCreate: (body: CreateEmployeeRequest) => Promise<void>;
+  onUpdate: (id: string, body: UpdateEmployeeRequest) => Promise<void>;
   onDelete: (id: string) => void;
 }) {
   const [tab, setTab] = useState<string>("all");
   const [groupByRole, setGroupByRole] = useState(false);
   const [adding, setAdding] = useState(false);
+  const [editing, setEditing] = useState<Employee | null>(null);
 
   const tabs: { id: string; label: string; count: number }[] = [
     { id: "all", label: "All", count: employees.length },
@@ -266,23 +284,41 @@ export function People({
         <td style={{ padding: "10px 16px" }}>
           <Chip tone={s.status === "active" ? "blue" : "neutral"}>{s.status}</Chip>
         </td>
-        <td style={{ padding: "10px 16px", textAlign: "right" }}>
-          <button
-            onClick={() => onDelete(s.id)}
-            style={{
-              border: "1px solid var(--red-200)",
-              color: "var(--red-700)",
-              background: "var(--red-50)",
-              borderRadius: 6,
-              padding: "5px 10px",
-              fontSize: 12,
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-            }}
-          >
-            Delete
-          </button>
+        <td style={{ padding: "10px 16px" }}>
+          <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
+            <button
+              onClick={() => setEditing(s)}
+              style={{
+                border: "1px solid var(--adaptive-200)",
+                color: "var(--adaptive-700)",
+                background: "var(--card)",
+                borderRadius: 6,
+                padding: "5px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Edit
+            </button>
+            <button
+              onClick={() => onDelete(s.id)}
+              style={{
+                border: "1px solid var(--red-200)",
+                color: "var(--red-700)",
+                background: "var(--red-50)",
+                borderRadius: 6,
+                padding: "5px 10px",
+                fontSize: 12,
+                fontWeight: 600,
+                cursor: "pointer",
+                fontFamily: "inherit",
+              }}
+            >
+              Delete
+            </button>
+          </div>
         </td>
       </tr>
     );
@@ -446,12 +482,17 @@ export function People({
         </div>
       </Card>
 
-      {adding && (
-        <AddMemberDrawer
+      {(adding || editing) && (
+        <MemberDrawer
+          employee={editing ?? undefined}
           departments={departments}
           roles={roles}
-          onClose={() => setAdding(false)}
+          onClose={() => {
+            setAdding(false);
+            setEditing(null);
+          }}
           onCreate={onCreate}
+          onUpdate={onUpdate}
         />
       )}
     </div>
