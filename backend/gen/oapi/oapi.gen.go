@@ -167,6 +167,48 @@ func (e EmployeeStatus) Valid() bool {
 	}
 }
 
+// Defines values for LeaveStatus.
+const (
+	Approved LeaveStatus = "approved"
+	Pending  LeaveStatus = "pending"
+	Rejected LeaveStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the LeaveStatus enum.
+func (e LeaveStatus) Valid() bool {
+	switch e {
+	case Approved:
+		return true
+	case Pending:
+		return true
+	case Rejected:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for LeaveType.
+const (
+	Holiday  LeaveType = "holiday"
+	Personal LeaveType = "personal"
+	Sick     LeaveType = "sick"
+)
+
+// Valid indicates whether the value is a known member of the LeaveType enum.
+func (e LeaveType) Valid() bool {
+	switch e {
+	case Holiday:
+		return true
+	case Personal:
+		return true
+	case Sick:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for LiveViewEntryAttendanceStatus.
 const (
 	LiveViewEntryAttendanceStatusCheckedIn    LiveViewEntryAttendanceStatus = "checked_in"
@@ -221,6 +263,33 @@ func (e TenantSummaryStatus) Valid() bool {
 	case TenantSummaryStatusProvisioning:
 		return true
 	case TenantSummaryStatusSuspended:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for TourCategory.
+const (
+	DayTrip TourCategory = "day_trip"
+	Driving TourCategory = "driving"
+	Evening TourCategory = "evening"
+	Food    TourCategory = "food"
+	Walking TourCategory = "walking"
+)
+
+// Valid indicates whether the value is a known member of the TourCategory enum.
+func (e TourCategory) Valid() bool {
+	switch e {
+	case DayTrip:
+		return true
+	case Driving:
+		return true
+	case Evening:
+		return true
+	case Food:
+		return true
+	case Walking:
 		return true
 	default:
 		return false
@@ -468,6 +537,17 @@ type CreateEmployeeRequestEmploymentType string
 // CreateEmployeeRequestStatus Optional on create; defaults to active.
 type CreateEmployeeRequestStatus string
 
+// CreateLeaveRequest defines model for CreateLeaveRequest.
+type CreateLeaveRequest struct {
+	// EndDate Inclusive end date; must be on or after start_date.
+	EndDate   openapi_types.Date `json:"end_date"`
+	Note      *string            `json:"note,omitempty"`
+	StartDate openapi_types.Date `json:"start_date"`
+
+	// Type Kind of leave being requested.
+	Type LeaveType `json:"type"`
+}
+
 // CreateLocationRequest defines model for CreateLocationRequest.
 type CreateLocationRequest struct {
 	Address *string  `json:"address,omitempty"`
@@ -502,6 +582,25 @@ type CreateShiftRequest struct {
 	LocationId *openapi_types.UUID `json:"location_id,omitempty"`
 	Notes      *string             `json:"notes,omitempty"`
 	StartsAt   time.Time           `json:"starts_at"`
+}
+
+// CreateTourRequest defines model for CreateTourRequest.
+type CreateTourRequest struct {
+	Active *bool `json:"active,omitempty"`
+
+	// Category Tour category.
+	Category       TourCategory `json:"category"`
+	Color          *string      `json:"color,omitempty"`
+	DepartureTimes *[]string    `json:"departure_times,omitempty"`
+	Description    *string      `json:"description,omitempty"`
+	DriversNeeded  *int         `json:"drivers_needed,omitempty"`
+	DurationMin    *int         `json:"duration_min,omitempty"`
+	GuidesNeeded   *int         `json:"guides_needed,omitempty"`
+	MaxGuests      *int         `json:"max_guests,omitempty"`
+	MeetingPoint   *string      `json:"meeting_point,omitempty"`
+	Name           string       `json:"name"`
+	PriceCents     *int         `json:"price_cents,omitempty"`
+	Rating         *float64     `json:"rating,omitempty"`
 }
 
 // CurrentUserResponse defines model for CurrentUserResponse.
@@ -555,6 +654,44 @@ type Error struct {
 	Message string `json:"message"`
 }
 
+// LeaveBalance defines model for LeaveBalance.
+type LeaveBalance struct {
+	// EntitledDays Days the employee is entitled to this year (a default applies if unset).
+	EntitledDays  int `json:"entitled_days"`
+	RemainingDays int `json:"remaining_days"`
+
+	// UsedDays Days consumed by approved requests in the year (calendar days, inclusive).
+	UsedDays int `json:"used_days"`
+	Year     int `json:"year"`
+}
+
+// LeaveRequest defines model for LeaveRequest.
+type LeaveRequest struct {
+	CreatedAt  time.Time          `json:"created_at"`
+	EmployeeId openapi_types.UUID `json:"employee_id"`
+	EndDate    openapi_types.Date `json:"end_date"`
+	Id         openapi_types.UUID `json:"id"`
+	Note       *string            `json:"note,omitempty"`
+	ReviewedAt *time.Time         `json:"reviewed_at,omitempty"`
+
+	// ReviewedBy Control-plane user id of the manager who reviewed it (no FK; different database).
+	ReviewedBy *openapi_types.UUID `json:"reviewed_by,omitempty"`
+	StartDate  openapi_types.Date  `json:"start_date"`
+
+	// Status Review state of a leave request.
+	Status LeaveStatus `json:"status"`
+
+	// Type Kind of leave being requested.
+	Type      LeaveType `json:"type"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// LeaveStatus Review state of a leave request.
+type LeaveStatus string
+
+// LeaveType Kind of leave being requested.
+type LeaveType string
+
 // LiveViewEntry defines model for LiveViewEntry.
 type LiveViewEntry struct {
 	// AttendanceStatus Derived state for this shift: not_checked_in (no attendance record linked), checked_in, or checked_out.
@@ -585,6 +722,19 @@ type LoginRequest struct {
 	Email      openapi_types.Email `json:"email"`
 	Password   string              `json:"password"`
 	TenantSlug string              `json:"tenant_slug"`
+}
+
+// MyStats defines model for MyStats.
+type MyStats struct {
+	// HoursThisWeek Hours from completed check-in/out pairs since the start of the current week (Monday, UTC).
+	HoursThisWeek float64 `json:"hours_this_week"`
+
+	// OnTimePct Percent of shifts-with-a-check-in where check-in was at or before the shift start (0–100). 100 when there are none.
+	OnTimePct       int `json:"on_time_pct"`
+	ShiftsThisMonth int `json:"shifts_this_month"`
+
+	// TenureDays Days since hired_at, or null when hired_at is unset.
+	TenureDays *int `json:"tenure_days,omitempty"`
 }
 
 // Role defines model for Role.
@@ -640,6 +790,42 @@ type TenantSummary struct {
 // TenantSummaryStatus defines model for TenantSummary.Status.
 type TenantSummaryStatus string
 
+// Tour defines model for Tour.
+type Tour struct {
+	// Active Whether the tour is bookable and schedulable.
+	Active bool `json:"active"`
+
+	// Category Tour category.
+	Category TourCategory `json:"category"`
+
+	// Color Accent colour (hex) for UI.
+	Color     *string   `json:"color,omitempty"`
+	CreatedAt time.Time `json:"created_at"`
+
+	// DepartureTimes Daily departure times as HH:MM strings.
+	DepartureTimes []string `json:"departure_times"`
+	Description    *string  `json:"description,omitempty"`
+	DriversNeeded  int      `json:"drivers_needed"`
+
+	// DurationMin Tour duration in minutes.
+	DurationMin  int                `json:"duration_min"`
+	GuidesNeeded int                `json:"guides_needed"`
+	Id           openapi_types.UUID `json:"id"`
+	MaxGuests    int                `json:"max_guests"`
+	MeetingPoint *string            `json:"meeting_point,omitempty"`
+	Name         string             `json:"name"`
+
+	// PriceCents Price per guest in minor currency units (e.g. euro cents).
+	PriceCents int `json:"price_cents"`
+
+	// Rating Average rating 0–5, or null when unrated.
+	Rating    *float64  `json:"rating,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// TourCategory Tour category.
+type TourCategory string
+
 // UpdateDepartmentRequest PATCH semantics — only provided fields are changed. Fields cannot be cleared back to null via PATCH in v1 (omitting a field and sending null are equivalent).
 type UpdateDepartmentRequest struct {
 	Name     *string             `json:"name,omitempty"`
@@ -687,6 +873,25 @@ type UpdateShiftRequest struct {
 	LocationId *openapi_types.UUID `json:"location_id,omitempty"`
 	Notes      *string             `json:"notes,omitempty"`
 	StartsAt   *time.Time          `json:"starts_at,omitempty"`
+}
+
+// UpdateTourRequest PATCH semantics — only provided fields change.
+type UpdateTourRequest struct {
+	Active *bool `json:"active,omitempty"`
+
+	// Category Tour category.
+	Category       *TourCategory `json:"category,omitempty"`
+	Color          *string       `json:"color,omitempty"`
+	DepartureTimes *[]string     `json:"departure_times,omitempty"`
+	Description    *string       `json:"description,omitempty"`
+	DriversNeeded  *int          `json:"drivers_needed,omitempty"`
+	DurationMin    *int          `json:"duration_min,omitempty"`
+	GuidesNeeded   *int          `json:"guides_needed,omitempty"`
+	MaxGuests      *int          `json:"max_guests,omitempty"`
+	MeetingPoint   *string       `json:"meeting_point,omitempty"`
+	Name           *string       `json:"name,omitempty"`
+	PriceCents     *int          `json:"price_cents,omitempty"`
+	Rating         *float64      `json:"rating,omitempty"`
 }
 
 // UserSummary defines model for UserSummary.
@@ -742,6 +947,12 @@ type ListEmployeesParams struct {
 // ListEmployeesParamsStatus defines parameters for ListEmployees.
 type ListEmployeesParamsStatus string
 
+// ListLeaveParams defines parameters for ListLeave.
+type ListLeaveParams struct {
+	Status     *LeaveStatus        `form:"status,omitempty" json:"status,omitempty"`
+	EmployeeId *openapi_types.UUID `form:"employee_id,omitempty" json:"employee_id,omitempty"`
+}
+
 // GetLiveViewParams defines parameters for GetLiveView.
 type GetLiveViewParams struct {
 	// From Inclusive lower bound on shift starts_at (ISO-8601). Defaults to start of the current UTC day.
@@ -780,6 +991,12 @@ type ListShiftsParams struct {
 // ListShiftsParamsStatus defines parameters for ListShifts.
 type ListShiftsParamsStatus string
 
+// ListToursParams defines parameters for ListTours.
+type ListToursParams struct {
+	Category *TourCategory `form:"category,omitempty" json:"category,omitempty"`
+	Active   *bool         `form:"active,omitempty" json:"active,omitempty"`
+}
+
 // CheckInJSONRequestBody defines body for CheckIn for application/json ContentType.
 type CheckInJSONRequestBody = CheckInRequest
 
@@ -813,6 +1030,9 @@ type CreateLocationJSONRequestBody = CreateLocationRequest
 // UpdateLocationJSONRequestBody defines body for UpdateLocation for application/json ContentType.
 type UpdateLocationJSONRequestBody = UpdateLocationRequest
 
+// CreateMyLeaveJSONRequestBody defines body for CreateMyLeave for application/json ContentType.
+type CreateMyLeaveJSONRequestBody = CreateLeaveRequest
+
 // CreateRoleJSONRequestBody defines body for CreateRole for application/json ContentType.
 type CreateRoleJSONRequestBody = CreateRoleRequest
 
@@ -824,6 +1044,12 @@ type CreateShiftJSONRequestBody = CreateShiftRequest
 
 // UpdateShiftJSONRequestBody defines body for UpdateShift for application/json ContentType.
 type UpdateShiftJSONRequestBody = UpdateShiftRequest
+
+// CreateTourJSONRequestBody defines body for CreateTour for application/json ContentType.
+type CreateTourJSONRequestBody = CreateTourRequest
+
+// UpdateTourJSONRequestBody defines body for UpdateTour for application/json ContentType.
+type UpdateTourJSONRequestBody = UpdateTourRequest
 
 // ServerInterface represents all server handlers.
 type ServerInterface interface {
@@ -878,6 +1104,15 @@ type ServerInterface interface {
 	// Provision a login for an employee.
 	// (POST /employees/{id}/login)
 	CreateEmployeeLogin(w http.ResponseWriter, r *http.Request, id IdParam)
+	// List leave requests (manager).
+	// (GET /leave)
+	ListLeave(w http.ResponseWriter, r *http.Request, params ListLeaveParams)
+	// Approve a leave request (manager).
+	// (POST /leave/{id}/approve)
+	ApproveLeave(w http.ResponseWriter, r *http.Request, id IdParam)
+	// Reject a leave request (manager).
+	// (POST /leave/{id}/reject)
+	RejectLeave(w http.ResponseWriter, r *http.Request, id IdParam)
 	// Manager live view — who is working now.
 	// (GET /live)
 	GetLiveView(w http.ResponseWriter, r *http.Request, params GetLiveViewParams)
@@ -896,9 +1131,21 @@ type ServerInterface interface {
 	// Update a location.
 	// (PATCH /locations/{id})
 	UpdateLocation(w http.ResponseWriter, r *http.Request, id IdParam)
+	// List the authenticated employee's own leave requests.
+	// (GET /me/leave)
+	ListMyLeave(w http.ResponseWriter, r *http.Request)
+	// Submit a time-off request (field staff).
+	// (POST /me/leave)
+	CreateMyLeave(w http.ResponseWriter, r *http.Request)
+	// The authenticated employee's leave balance for the current year.
+	// (GET /me/leave/balance)
+	GetMyLeaveBalance(w http.ResponseWriter, r *http.Request)
 	// List the authenticated employee's own shifts.
 	// (GET /me/shifts)
 	ListMyShifts(w http.ResponseWriter, r *http.Request, params ListMyShiftsParams)
+	// The authenticated employee's personal activity stats.
+	// (GET /me/stats)
+	GetMyStats(w http.ResponseWriter, r *http.Request)
 	// List roles.
 	// (GET /roles)
 	ListRoles(w http.ResponseWriter, r *http.Request)
@@ -932,6 +1179,21 @@ type ServerInterface interface {
 	// Publish a shift.
 	// (POST /shifts/{id}/publish)
 	PublishShift(w http.ResponseWriter, r *http.Request, id IdParam)
+	// List tours in the catalog.
+	// (GET /tours)
+	ListTours(w http.ResponseWriter, r *http.Request, params ListToursParams)
+	// Create a tour.
+	// (POST /tours)
+	CreateTour(w http.ResponseWriter, r *http.Request)
+	// Delete a tour.
+	// (DELETE /tours/{id})
+	DeleteTour(w http.ResponseWriter, r *http.Request, id IdParam)
+	// Get a tour by id.
+	// (GET /tours/{id})
+	GetTour(w http.ResponseWriter, r *http.Request, id IdParam)
+	// Update a tour.
+	// (PATCH /tours/{id})
+	UpdateTour(w http.ResponseWriter, r *http.Request, id IdParam)
 }
 
 // Unimplemented server implementation that returns http.StatusNotImplemented for each endpoint.
@@ -1040,6 +1302,24 @@ func (_ Unimplemented) CreateEmployeeLogin(w http.ResponseWriter, r *http.Reques
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List leave requests (manager).
+// (GET /leave)
+func (_ Unimplemented) ListLeave(w http.ResponseWriter, r *http.Request, params ListLeaveParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Approve a leave request (manager).
+// (POST /leave/{id}/approve)
+func (_ Unimplemented) ApproveLeave(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Reject a leave request (manager).
+// (POST /leave/{id}/reject)
+func (_ Unimplemented) RejectLeave(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // Manager live view — who is working now.
 // (GET /live)
 func (_ Unimplemented) GetLiveView(w http.ResponseWriter, r *http.Request, params GetLiveViewParams) {
@@ -1076,9 +1356,33 @@ func (_ Unimplemented) UpdateLocation(w http.ResponseWriter, r *http.Request, id
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
+// List the authenticated employee's own leave requests.
+// (GET /me/leave)
+func (_ Unimplemented) ListMyLeave(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Submit a time-off request (field staff).
+// (POST /me/leave)
+func (_ Unimplemented) CreateMyLeave(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// The authenticated employee's leave balance for the current year.
+// (GET /me/leave/balance)
+func (_ Unimplemented) GetMyLeaveBalance(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
 // List the authenticated employee's own shifts.
 // (GET /me/shifts)
 func (_ Unimplemented) ListMyShifts(w http.ResponseWriter, r *http.Request, params ListMyShiftsParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// The authenticated employee's personal activity stats.
+// (GET /me/stats)
+func (_ Unimplemented) GetMyStats(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1145,6 +1449,36 @@ func (_ Unimplemented) UpdateShift(w http.ResponseWriter, r *http.Request, id Id
 // Publish a shift.
 // (POST /shifts/{id}/publish)
 func (_ Unimplemented) PublishShift(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// List tours in the catalog.
+// (GET /tours)
+func (_ Unimplemented) ListTours(w http.ResponseWriter, r *http.Request, params ListToursParams) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Create a tour.
+// (POST /tours)
+func (_ Unimplemented) CreateTour(w http.ResponseWriter, r *http.Request) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Delete a tour.
+// (DELETE /tours/{id})
+func (_ Unimplemented) DeleteTour(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Get a tour by id.
+// (GET /tours/{id})
+func (_ Unimplemented) GetTour(w http.ResponseWriter, r *http.Request, id IdParam) {
+	w.WriteHeader(http.StatusNotImplemented)
+}
+
+// Update a tour.
+// (PATCH /tours/{id})
+func (_ Unimplemented) UpdateTour(w http.ResponseWriter, r *http.Request, id IdParam) {
 	w.WriteHeader(http.StatusNotImplemented)
 }
 
@@ -1659,6 +1993,122 @@ func (siw *ServerInterfaceWrapper) CreateEmployeeLogin(w http.ResponseWriter, r 
 	handler.ServeHTTP(w, r)
 }
 
+// ListLeave operation middleware
+func (siw *ServerInterfaceWrapper) ListLeave(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListLeaveParams
+
+	// ------------- Optional query parameter "status" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "status", r.URL.Query(), &params.Status, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "status"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "status", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "employee_id" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "employee_id", r.URL.Query(), &params.EmployeeId, runtime.BindQueryParameterOptions{Type: "string", Format: "uuid"})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "employee_id"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "employee_id", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListLeave(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// ApproveLeave operation middleware
+func (siw *ServerInterfaceWrapper) ApproveLeave(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ApproveLeave(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// RejectLeave operation middleware
+func (siw *ServerInterfaceWrapper) RejectLeave(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.RejectLeave(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // GetLiveView operation middleware
 func (siw *ServerInterfaceWrapper) GetLiveView(w http.ResponseWriter, r *http.Request) {
 
@@ -1847,6 +2297,66 @@ func (siw *ServerInterfaceWrapper) UpdateLocation(w http.ResponseWriter, r *http
 	handler.ServeHTTP(w, r)
 }
 
+// ListMyLeave operation middleware
+func (siw *ServerInterfaceWrapper) ListMyLeave(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListMyLeave(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateMyLeave operation middleware
+func (siw *ServerInterfaceWrapper) CreateMyLeave(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateMyLeave(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyLeaveBalance operation middleware
+func (siw *ServerInterfaceWrapper) GetMyLeaveBalance(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyLeaveBalance(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 // ListMyShifts operation middleware
 func (siw *ServerInterfaceWrapper) ListMyShifts(w http.ResponseWriter, r *http.Request) {
 
@@ -1903,6 +2413,26 @@ func (siw *ServerInterfaceWrapper) ListMyShifts(w http.ResponseWriter, r *http.R
 
 	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		siw.Handler.ListMyShifts(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetMyStats operation middleware
+func (siw *ServerInterfaceWrapper) GetMyStats(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetMyStats(w, r)
 	}))
 
 	for _, middleware := range siw.HandlerMiddlewares {
@@ -2274,6 +2804,174 @@ func (siw *ServerInterfaceWrapper) PublishShift(w http.ResponseWriter, r *http.R
 	handler.ServeHTTP(w, r)
 }
 
+// ListTours operation middleware
+func (siw *ServerInterfaceWrapper) ListTours(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	// Parameter object where we will unmarshal all parameters from the context
+	var params ListToursParams
+
+	// ------------- Optional query parameter "category" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "category", r.URL.Query(), &params.Category, runtime.BindQueryParameterOptions{Type: "string", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "category"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "category", Err: err})
+		}
+		return
+	}
+
+	// ------------- Optional query parameter "active" -------------
+
+	err = runtime.BindQueryParameterWithOptions("form", true, false, "active", r.URL.Query(), &params.Active, runtime.BindQueryParameterOptions{Type: "boolean", Format: ""})
+	if err != nil {
+		var requiredError *runtime.RequiredParameterError
+		if errors.As(err, &requiredError) {
+			siw.ErrorHandlerFunc(w, r, &RequiredParamError{ParamName: "active"})
+		} else {
+			siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "active", Err: err})
+		}
+		return
+	}
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.ListTours(w, r, params)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// CreateTour operation middleware
+func (siw *ServerInterfaceWrapper) CreateTour(w http.ResponseWriter, r *http.Request) {
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.CreateTour(w, r)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// DeleteTour operation middleware
+func (siw *ServerInterfaceWrapper) DeleteTour(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.DeleteTour(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// GetTour operation middleware
+func (siw *ServerInterfaceWrapper) GetTour(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.GetTour(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
+// UpdateTour operation middleware
+func (siw *ServerInterfaceWrapper) UpdateTour(w http.ResponseWriter, r *http.Request) {
+
+	var err error
+	_ = err
+
+	// ------------- Path parameter "id" -------------
+	var id IdParam
+
+	err = runtime.BindStyledParameterWithOptions("simple", "id", chi.URLParam(r, "id"), &id, runtime.BindStyledParameterOptions{ParamLocation: runtime.ParamLocationPath, Explode: false, Required: true, Type: "string", Format: "uuid"})
+	if err != nil {
+		siw.ErrorHandlerFunc(w, r, &InvalidParamFormatError{ParamName: "id", Err: err})
+		return
+	}
+
+	ctx := r.Context()
+
+	ctx = context.WithValue(ctx, BearerAuthScopes, []string{})
+
+	r = r.WithContext(ctx)
+
+	handler := http.Handler(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		siw.Handler.UpdateTour(w, r, id)
+	}))
+
+	for _, middleware := range siw.HandlerMiddlewares {
+		handler = middleware(handler)
+	}
+
+	handler.ServeHTTP(w, r)
+}
+
 type UnescapedCookieParamError struct {
 	ParamName string
 	Err       error
@@ -2439,6 +3137,15 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Post(options.BaseURL+"/employees/{id}/login", wrapper.CreateEmployeeLogin)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/leave", wrapper.ListLeave)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/leave/{id}/approve", wrapper.ApproveLeave)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/leave/{id}/reject", wrapper.RejectLeave)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/live", wrapper.GetLiveView)
 	})
 	r.Group(func(r chi.Router) {
@@ -2457,7 +3164,19 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 		r.Patch(options.BaseURL+"/locations/{id}", wrapper.UpdateLocation)
 	})
 	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/leave", wrapper.ListMyLeave)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/me/leave", wrapper.CreateMyLeave)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/leave/balance", wrapper.GetMyLeaveBalance)
+	})
+	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/me/shifts", wrapper.ListMyShifts)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/me/stats", wrapper.GetMyStats)
 	})
 	r.Group(func(r chi.Router) {
 		r.Get(options.BaseURL+"/roles", wrapper.ListRoles)
@@ -2492,6 +3211,21 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 	r.Group(func(r chi.Router) {
 		r.Post(options.BaseURL+"/shifts/{id}/publish", wrapper.PublishShift)
 	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/tours", wrapper.ListTours)
+	})
+	r.Group(func(r chi.Router) {
+		r.Post(options.BaseURL+"/tours", wrapper.CreateTour)
+	})
+	r.Group(func(r chi.Router) {
+		r.Delete(options.BaseURL+"/tours/{id}", wrapper.DeleteTour)
+	})
+	r.Group(func(r chi.Router) {
+		r.Get(options.BaseURL+"/tours/{id}", wrapper.GetTour)
+	})
+	r.Group(func(r chi.Router) {
+		r.Patch(options.BaseURL+"/tours/{id}", wrapper.UpdateTour)
+	})
 
 	return r
 }
@@ -2501,89 +3235,119 @@ func HandlerWithOptions(si ServerInterface, options ChiServerOptions) http.Handl
 // const string: with thousands of chunks the chained `+` fold is several
 // times slower for the Go compiler than parsing a slice literal.
 var swaggerSpec = []string{
-	"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",
+	"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",
+	"n9Hl7QF256j653N0/PH9x/8LAAD//w==",
 }
 
 // decodeSpec returns the embedded OpenAPI spec as raw JSON bytes,

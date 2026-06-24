@@ -20,6 +20,10 @@ tags:
     description: Scheduling — shifts and locations (tenant data).
   - name: attendance
     description: Field attendance — check-in/out, offline-tolerant via a client-supplied id (tenant data).
+  - name: leave
+    description: Time-off requests and per-employee leave balances (tenant data).
+  - name: tours
+    description: Tour catalog and management — the experiences a tenant offers (tenant data).
 
 paths:
   /auth/signup:
@@ -927,6 +931,291 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /me/leave:
+    get:
+      operationId: listMyLeave
+      tags: [leave]
+      summary: List the authenticated employee's own leave requests.
+      description: >
+        Field-facing: leave requests for the employee linked to the caller's
+        login (resolved from the token), newest first. Empty list if the caller
+        has no linked employee record.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's leave requests.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createMyLeave
+      tags: [leave]
+      summary: Submit a time-off request (field staff).
+      description: >
+        Creates a pending leave request for the employee linked to the caller's
+        login. Managers review it via the /leave endpoints.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateLeaveRequest'
+      responses:
+        '201':
+          description: Leave request created (status pending).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /me/leave/balance:
+    get:
+      operationId: getMyLeaveBalance
+      tags: [leave]
+      summary: The authenticated employee's leave balance for the current year.
+      description: >
+        Entitled days come from the employee's balance row (default applies when
+        none is set); used days are computed from approved requests in the year.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's leave balance.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveBalance'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /leave:
+    get:
+      operationId: listLeave
+      tags: [leave]
+      summary: List leave requests (manager).
+      description: All leave requests in the tenant, newest first, optionally filtered by status or employee.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: status
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/LeaveStatus'
+        - name: employee_id
+          in: query
+          required: false
+          schema:
+            type: string
+            format: uuid
+      responses:
+        '200':
+          description: Leave requests.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/LeaveRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /leave/{id}/approve:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      operationId: approveLeave
+      tags: [leave]
+      summary: Approve a leave request (manager).
+      description: Marks a pending request approved and records the reviewing user and time. Idempotent on an already-approved request.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The updated leave request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /leave/{id}/reject:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    post:
+      operationId: rejectLeave
+      tags: [leave]
+      summary: Reject a leave request (manager).
+      description: Marks a pending request rejected and records the reviewing user and time. Idempotent on an already-rejected request.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The updated leave request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/LeaveRequest'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /tours:
+    get:
+      operationId: listTours
+      tags: [tours]
+      summary: List tours in the catalog.
+      description: The tenant's tour catalog, optionally filtered by category or active flag. Ordered by name.
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: category
+          in: query
+          required: false
+          schema:
+            $ref: '#/components/schemas/TourCategory'
+        - name: active
+          in: query
+          required: false
+          schema:
+            type: boolean
+      responses:
+        '200':
+          description: The tenant's tours.
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Tour'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+    post:
+      operationId: createTour
+      tags: [tours]
+      summary: Create a tour.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTourRequest'
+      responses:
+        '201':
+          description: Tour created.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
+  /tours/{id}:
+    parameters:
+      - $ref: '#/components/parameters/IdParam'
+    get:
+      operationId: getTour
+      tags: [tours]
+      summary: Get a tour by id.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The tour.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    patch:
+      operationId: updateTour
+      tags: [tours]
+      summary: Update a tour.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTourRequest'
+      responses:
+        '200':
+          description: Updated tour.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Tour'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+    delete:
+      operationId: deleteTour
+      tags: [tours]
+      summary: Delete a tour.
+      security:
+        - bearerAuth: []
+      responses:
+        '204':
+          description: Deleted.
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /me/stats:
+    get:
+      operationId: getMyStats
+      tags: [attendance]
+      summary: The authenticated employee's personal activity stats.
+      description: >
+        Computed (not stored) from the caller's shifts and attendance: shifts
+        this calendar month, hours worked this week (from completed check-in/out
+        pairs), on-time rate (check-in at or before the shift start over shifts
+        with a check-in), and tenure in days (from hired_at). Read-only; this is
+        a convenience aggregate for the field-app profile, not analytics infra.
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: The caller's stats. Zeroes when there is no linked employee or no data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MyStats'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -1613,4 +1902,243 @@ components:
         check_out_at:
           type: string
           format: date-time
+          nullable: true
+
+    LeaveType:
+      type: string
+      description: Kind of leave being requested.
+      enum: [holiday, sick, personal]
+
+    LeaveStatus:
+      type: string
+      description: Review state of a leave request.
+      enum: [pending, approved, rejected]
+
+    LeaveRequest:
+      type: object
+      required: [id, employee_id, type, start_date, end_date, status, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        employee_id:
+          type: string
+          format: uuid
+        type:
+          $ref: '#/components/schemas/LeaveType'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+        note:
+          type: string
+          nullable: true
+        status:
+          $ref: '#/components/schemas/LeaveStatus'
+        reviewed_by:
+          type: string
+          format: uuid
+          nullable: true
+          description: Control-plane user id of the manager who reviewed it (no FK; different database).
+        reviewed_at:
+          type: string
+          format: date-time
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateLeaveRequest:
+      type: object
+      required: [type, start_date, end_date]
+      properties:
+        type:
+          $ref: '#/components/schemas/LeaveType'
+        start_date:
+          type: string
+          format: date
+        end_date:
+          type: string
+          format: date
+          description: Inclusive end date; must be on or after start_date.
+        note:
+          type: string
+          nullable: true
+
+    LeaveBalance:
+      type: object
+      required: [year, entitled_days, used_days, remaining_days]
+      properties:
+        year:
+          type: integer
+        entitled_days:
+          type: integer
+          description: Days the employee is entitled to this year (a default applies if unset).
+        used_days:
+          type: integer
+          description: Days consumed by approved requests in the year (calendar days, inclusive).
+        remaining_days:
+          type: integer
+
+    MyStats:
+      type: object
+      required: [shifts_this_month, hours_this_week, on_time_pct]
+      properties:
+        shifts_this_month:
+          type: integer
+        hours_this_week:
+          type: number
+          format: double
+          description: Hours from completed check-in/out pairs since the start of the current week (Monday, UTC).
+        on_time_pct:
+          type: integer
+          description: Percent of shifts-with-a-check-in where check-in was at or before the shift start (0–100). 100 when there are none.
+        tenure_days:
+          type: integer
+          nullable: true
+          description: Days since hired_at, or null when hired_at is unset.
+
+    TourCategory:
+      type: string
+      description: Tour category.
+      enum: [walking, day_trip, food, driving, evening]
+
+    Tour:
+      type: object
+      required: [id, name, category, duration_min, max_guests, guides_needed, drivers_needed, departure_times, price_cents, active, created_at, updated_at]
+      properties:
+        id:
+          type: string
+          format: uuid
+        name:
+          type: string
+        category:
+          $ref: '#/components/schemas/TourCategory'
+        meeting_point:
+          type: string
+          nullable: true
+        duration_min:
+          type: integer
+          description: Tour duration in minutes.
+        max_guests:
+          type: integer
+        guides_needed:
+          type: integer
+        drivers_needed:
+          type: integer
+        departure_times:
+          type: array
+          description: Daily departure times as HH:MM strings.
+          items:
+            type: string
+        price_cents:
+          type: integer
+          description: Price per guest in minor currency units (e.g. euro cents).
+        rating:
+          type: number
+          format: double
+          nullable: true
+          description: Average rating 0–5, or null when unrated.
+        active:
+          type: boolean
+          description: Whether the tour is bookable and schedulable.
+        color:
+          type: string
+          nullable: true
+          description: Accent colour (hex) for UI.
+        description:
+          type: string
+          nullable: true
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+
+    CreateTourRequest:
+      type: object
+      required: [name, category]
+      properties:
+        name:
+          type: string
+        category:
+          $ref: '#/components/schemas/TourCategory'
+        meeting_point:
+          type: string
+          nullable: true
+        duration_min:
+          type: integer
+          default: 120
+        max_guests:
+          type: integer
+          default: 10
+        guides_needed:
+          type: integer
+          default: 1
+        drivers_needed:
+          type: integer
+          default: 0
+        departure_times:
+          type: array
+          items:
+            type: string
+        price_cents:
+          type: integer
+          default: 0
+        rating:
+          type: number
+          format: double
+          nullable: true
+        active:
+          type: boolean
+          default: true
+        color:
+          type: string
+          nullable: true
+        description:
+          type: string
+          nullable: true
+
+    UpdateTourRequest:
+      type: object
+      description: PATCH semantics — only provided fields change.
+      properties:
+        name:
+          type: string
+        category:
+          $ref: '#/components/schemas/TourCategory'
+        meeting_point:
+          type: string
+          nullable: true
+        duration_min:
+          type: integer
+        max_guests:
+          type: integer
+        guides_needed:
+          type: integer
+        drivers_needed:
+          type: integer
+        departure_times:
+          type: array
+          items:
+            type: string
+        price_cents:
+          type: integer
+        rating:
+          type: number
+          format: double
+          nullable: true
+        active:
+          type: boolean
+        color:
+          type: string
+          nullable: true
+        description:
+          type: string
           nullable: true

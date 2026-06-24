@@ -7,8 +7,11 @@ import (
 	"github.com/davidnguyen2205/opero/backend/internal/attendance"
 	"github.com/davidnguyen2205/opero/backend/internal/controlplane"
 	"github.com/davidnguyen2205/opero/backend/internal/identity"
+	"github.com/davidnguyen2205/opero/backend/internal/leave"
 	"github.com/davidnguyen2205/opero/backend/internal/liveview"
 	"github.com/davidnguyen2205/opero/backend/internal/roster"
+	"github.com/davidnguyen2205/opero/backend/internal/stats"
+	"github.com/davidnguyen2205/opero/backend/internal/tours"
 )
 
 // apiHandler composes the per-module handlers into the single ServerInterface
@@ -16,11 +19,14 @@ import (
 // anonymously — they'd collide on the promoted field name "Handler" — so
 // methods are forwarded explicitly.)
 type apiHandler struct {
-	cp *controlplane.Handler
-	id *identity.Handler
-	rs *roster.Handler
-	at *attendance.Handler
-	lv *liveview.Handler
+	cp  *controlplane.Handler
+	id  *identity.Handler
+	rs  *roster.Handler
+	at  *attendance.Handler
+	lv  *liveview.Handler
+	lv2 *leave.Handler
+	st  *stats.Handler
+	tr  *tours.Handler
 }
 
 var _ oapi.ServerInterface = (*apiHandler)(nil)
@@ -132,4 +138,40 @@ func (a *apiHandler) CheckOut(w http.ResponseWriter, r *http.Request) { a.at.Che
 // liveview
 func (a *apiHandler) GetLiveView(w http.ResponseWriter, r *http.Request, params oapi.GetLiveViewParams) {
 	a.lv.GetLiveView(w, r, params)
+}
+
+// leave
+func (a *apiHandler) ListMyLeave(w http.ResponseWriter, r *http.Request) { a.lv2.ListMyLeave(w, r) }
+func (a *apiHandler) CreateMyLeave(w http.ResponseWriter, r *http.Request) {
+	a.lv2.CreateMyLeave(w, r)
+}
+func (a *apiHandler) GetMyLeaveBalance(w http.ResponseWriter, r *http.Request) {
+	a.lv2.GetMyLeaveBalance(w, r)
+}
+func (a *apiHandler) ListLeave(w http.ResponseWriter, r *http.Request, params oapi.ListLeaveParams) {
+	a.lv2.ListLeave(w, r, params)
+}
+func (a *apiHandler) ApproveLeave(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.lv2.ApproveLeave(w, r, id)
+}
+func (a *apiHandler) RejectLeave(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.lv2.RejectLeave(w, r, id)
+}
+
+// stats
+func (a *apiHandler) GetMyStats(w http.ResponseWriter, r *http.Request) { a.st.GetMyStats(w, r) }
+
+// tours
+func (a *apiHandler) ListTours(w http.ResponseWriter, r *http.Request, params oapi.ListToursParams) {
+	a.tr.ListTours(w, r, params)
+}
+func (a *apiHandler) CreateTour(w http.ResponseWriter, r *http.Request) { a.tr.CreateTour(w, r) }
+func (a *apiHandler) GetTour(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.tr.GetTour(w, r, id)
+}
+func (a *apiHandler) UpdateTour(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.tr.UpdateTour(w, r, id)
+}
+func (a *apiHandler) DeleteTour(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.tr.DeleteTour(w, r, id)
 }
