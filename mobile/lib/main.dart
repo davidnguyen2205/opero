@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'api/api_client.dart';
 import 'api/auth_store.dart';
 import 'attendance/attendance_service.dart';
 import 'offline/queue.dart';
 import 'screens/login_screen.dart';
-import 'screens/shifts_screen.dart';
+import 'screens/onboarding_screen.dart';
+import 'screens/shell.dart';
+import 'theme.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -32,27 +35,55 @@ class OperoApp extends StatefulWidget {
 }
 
 class _OperoAppState extends State<OperoApp> {
-  late bool _authed = widget.auth.isAuthenticated;
+  static const _seenOnboardingKey = 'opero.onboarding.seen';
 
-  void _refreshAuth() => setState(() => _authed = widget.auth.isAuthenticated);
+  late bool _authed = widget.auth.isAuthenticated;
+  bool _seenOnboarding = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadOnboardingFlag();
+  }
+
+  Future<void> _loadOnboardingFlag() async {
+    final prefs = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _seenOnboarding = prefs.getBool(_seenOnboardingKey) ?? false);
+    }
+  }
+
+  void _onAuthenticated() => setState(() => _authed = widget.auth.isAuthenticated);
+
+  void _onSignedOut() => setState(() => _authed = widget.auth.isAuthenticated);
+
+  Future<void> _finishOnboarding() async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_seenOnboardingKey, true);
+    if (mounted) setState(() => _seenOnboarding = true);
+  }
 
   @override
   Widget build(BuildContext context) {
+    final Widget home;
+    if (!_authed) {
+      home = LoginScreen(api: widget.api, auth: widget.auth, onAuthenticated: _onAuthenticated);
+    } else if (!_seenOnboarding) {
+      home = OnboardingScreen(onDone: _finishOnboarding);
+    } else {
+      home = Shell(
+        api: widget.api,
+        auth: widget.auth,
+        attendance: widget.attendance,
+        onSignedOut: _onSignedOut,
+      );
+    }
+
     return MaterialApp(
       title: 'Opero',
-      theme: ThemeData(colorSchemeSeed: Colors.indigo, useMaterial3: true),
-      home: _authed
-          ? ShiftsScreen(
-              api: widget.api,
-              auth: widget.auth,
-              attendance: widget.attendance,
-              onSignedOut: _refreshAuth,
-            )
-          : LoginScreen(
-              api: widget.api,
-              auth: widget.auth,
-              onAuthenticated: _refreshAuth,
-            ),
+      debugShowCheckedModeBanner: false,
+      theme: buildOperoTheme(),
+      home: home,
     );
   }
 }

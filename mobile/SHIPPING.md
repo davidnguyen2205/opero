@@ -2,14 +2,39 @@
 
 Field-staff app (Flutter): sign in → see my shifts → check in/out, offline-tolerant.
 
-> **READ THIS FIRST — verification status.** This app was authored **without a
-> Flutter/Dart toolchain available**, so **none of the Dart has been compiled,
-> analyzed, run, or tested.** Treat everything under `lib/` as a first draft that
-> is very likely to need fixes on first `flutter analyze`/`flutter run`. The
-> logic (offline queue, client_id lifecycle, request shaping) is the most
-> carefully written; the Flutter/plugin-specific code (geolocator, image_picker
-> APIs) is the most likely to need version reconciliation. Package versions in
-> `pubspec.yaml` are best-effort guesses (knowledge cutoff Jan 2026).
+> **VERIFICATION STATUS (updated 2026-06-24).** The app now **compiles and
+> `flutter analyze` is clean** (Flutter 3.44 / Dart 3.12). It has been built for
+> **web** and the login → my-shifts → check-in API path was verified against the
+> running backend. It has **NOT** been built or run on a real iOS/Android device
+> or emulator (none available in this environment) — geolocator/image_picker and
+> the offline airplane-mode flow behave differently on web and are unverified on
+> device. Treat device behaviour as untested until run on a simulator/emulator.
+
+## Screen inventory — REAL vs MOCK
+
+The field app screens (ported from the Claude Design prototype) are:
+
+| Screen | Backed by | Notes |
+|---|---|---|
+| Login (`login_screen.dart`) | **REAL** `POST /auth/login` | Adds a tenant-slug field (multi-tenant); prototype showed only email/pw. |
+| Onboarding (`onboarding_screen.dart`) | client-only | 4-slide carousel, shown once (shared_preferences flag). Location toggle calls the real permission prompt; notifications toggle is cosmetic (no push in v1). |
+| Today/home (`today_screen.dart`) | **REAL** `GET /me/shifts` | Today's published shift + Check In. |
+| Check-in flow (`checkin_flow.dart`) | **REAL** attendance | locate→photo→confirm→active→done via offline-tolerant `AttendanceService`. Photo captured but not uploaded (no blob storage). "Within 25 m" is cosmetic; "Break" is a local-only toggle (no break API). |
+| Schedule (`schedule_screen.dart`) | **REAL** `GET /me/shifts` (+ `GET /locations`) | Location name, time window, status. No tour name/party size — the API has none. |
+| Shift detail (`shift_detail_screen.dart`) | **REAL** | Same data; meeting point = location address; notes = shift.notes. |
+| Inbox + thread (`inbox_screen.dart`, `thread_screen.dart`) | **MOCK** | No messaging API in v1. Badged "Demo"; sent messages are local-only. |
+| Notifications (`notifications_screen.dart`) | **MOCK** | No notifications API. Badged "Demo". |
+| Profile (`profile_screen.dart`) | identity **REAL** (token), stats **MOCK** | Email/role/tenant from `AuthStore`; on-time/hours/tours/tenure/phone/empId/time-off are demo. Sign out is real. |
+| Time-off (`timeoff_screen.dart`) | **MOCK** | No leave API (v1.1). Form does not persist/notify; badged "Demo". |
+
+All mock data lives in `lib/mock/field_mock.dart` (clearly marked demo-only) and
+mock screens show a "Demo" badge in the UI. When the messaging / notifications /
+leave / analytics APIs exist, delete that file and wire the screens to the client.
+
+> Historical note: this app was originally authored without a Flutter toolchain,
+> so the logic (offline queue, client_id lifecycle, request shaping) was written
+> most carefully and the plugin-specific code (geolocator, image_picker) flagged
+> as most likely to need reconciliation. It has since been analyzed clean.
 
 ## 1. Prerequisites
 
