@@ -1,15 +1,20 @@
 import { useState } from "react";
 import type {
+  AccessLevel,
   CreateRoleRequest,
+  Department,
   Employee,
   Role,
   UpdateRoleRequest,
 } from "../api/resources";
 import {
+  ACCESS_LABEL,
+  ACCESS_TONE,
   Avatar,
   AvatarStack,
   Btn,
   Card,
+  Chip,
   Drawer,
   DrawerSectionLabel,
   Field,
@@ -24,6 +29,8 @@ import {
 } from "../ui";
 import type { Person } from "../ui";
 
+const ACCESS_LEVELS: AccessLevel[] = ["mobile", "web_manager", "web_admin"];
+
 function toPeople(employees: Employee[]): Person[] {
   return employees.map((e) => ({ id: e.id, name: e.full_name }));
 }
@@ -31,12 +38,14 @@ function toPeople(employees: Employee[]): Person[] {
 function RoleDetailDrawer({
   role,
   members,
+  departmentName,
   onClose,
   onEdit,
   onDelete,
 }: {
   role: Role;
   members: Employee[];
+  departmentName: string | null;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -50,9 +59,11 @@ function RoleDetailDrawer({
           <span style={{ width: 12, height: 12, borderRadius: 4, background: colorForId(role.id), flexShrink: 0 }} />
           <div style={{ minWidth: 0 }}>
             <div style={{ fontSize: 16, fontWeight: 600, color: "var(--adaptive-900)" }}>{role.name}</div>
-            <div style={{ fontSize: 12.5, color: "var(--adaptive-500)" }}>
-              {members.length} {members.length === 1 ? "person" : "people"} · {role.permissions.length} permission
-              {role.permissions.length === 1 ? "" : "s"}
+            <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
+              <Chip tone={ACCESS_TONE[role.access_level] ?? "neutral"}>
+                {ACCESS_LABEL[role.access_level] ?? role.access_level}
+              </Chip>
+              {departmentName && <Chip>{departmentName}</Chip>}
             </div>
           </div>
         </>
@@ -142,11 +153,13 @@ function RoleDetailDrawer({
 
 function RoleFormDrawer({
   role,
+  departments,
   onClose,
   onCreate,
   onUpdate,
 }: {
   role: Role | null;
+  departments: Department[];
   onClose: () => void;
   onCreate: (body: CreateRoleRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateRoleRequest) => Promise<void>;
@@ -154,6 +167,8 @@ function RoleFormDrawer({
   const isEdit = Boolean(role);
   const [name, setName] = useState(role?.name ?? "");
   const [description, setDescription] = useState(role?.description ?? "");
+  const [departmentId, setDepartmentId] = useState(role?.department_id ?? "");
+  const [accessLevel, setAccessLevel] = useState<AccessLevel>(role?.access_level ?? "mobile");
   const [permissions, setPermissions] = useState((role?.permissions ?? []).join(", "));
   const [submitting, setSubmitting] = useState(false);
   const canSubmit = name.trim().length > 0 && !submitting;
@@ -165,6 +180,8 @@ function RoleFormDrawer({
       const body = {
         name: name.trim(),
         description: description.trim() || undefined,
+        department_id: departmentId || undefined,
+        access_level: accessLevel,
         permissions: permissions
           .split(",")
           .map((p) => p.trim())
@@ -208,6 +225,35 @@ function RoleFormDrawer({
             style={{ ...controlStyle, minHeight: 80, resize: "vertical" }}
           />
         </Field>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Department">
+              <select value={departmentId} onChange={(e) => setDepartmentId(e.target.value)} style={controlStyle}>
+                <option value="">None</option>
+                {departments.map((d) => (
+                  <option key={d.id} value={d.id}>
+                    {d.name}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Field label="Access level">
+              <select
+                value={accessLevel}
+                onChange={(e) => setAccessLevel(e.target.value as AccessLevel)}
+                style={controlStyle}
+              >
+                {ACCESS_LEVELS.map((a) => (
+                  <option key={a} value={a}>
+                    {ACCESS_LABEL[a]}
+                  </option>
+                ))}
+              </select>
+            </Field>
+          </div>
+        </div>
         <Field label="Permissions (comma-separated)">
           <input
             value={permissions}
@@ -224,12 +270,14 @@ function RoleFormDrawer({
 export function Roles({
   roles,
   employees,
+  departments,
   onCreate,
   onUpdate,
   onDelete,
 }: {
   roles: Role[];
   employees: Employee[];
+  departments: Department[];
   onCreate: (body: CreateRoleRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateRoleRequest) => Promise<void>;
   onDelete: (id: string) => void;
@@ -238,9 +286,12 @@ export function Roles({
   const [editing, setEditing] = useState<Role | "new" | null>(null);
   const [sort, toggleSort] = useSort("name");
   const membersOf = (r: Role) => employees.filter((e) => e.role_id === r.id);
+  const deptName = new Map(departments.map((d) => [d.id, d.name]));
 
   const sorted = sortRows(roles, sort, {
     name: (r) => r.name,
+    department: (r) => (r.department_id ? deptName.get(r.department_id) ?? "" : ""),
+    access: (r) => ACCESS_LABEL[r.access_level] ?? r.access_level,
     people: (r) => membersOf(r).length,
     perms: (r) => r.permissions.length,
   });
@@ -270,6 +321,8 @@ export function Roles({
                   {(
                     [
                       ["Role", "name"],
+                      ["Department", "department"],
+                      ["Access", "access"],
                       ["People", "people"],
                       ["Permissions", "perms"],
                       ["", null],
@@ -317,6 +370,14 @@ export function Roles({
                           </div>
                         </div>
                       </td>
+                      <td style={{ padding: "12px 16px", color: "var(--adaptive-700)" }}>
+                        {r.department_id ? deptName.get(r.department_id) ?? "Unknown" : "—"}
+                      </td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <Chip tone={ACCESS_TONE[r.access_level] ?? "neutral"}>
+                          {ACCESS_LABEL[r.access_level] ?? r.access_level}
+                        </Chip>
+                      </td>
                       <td style={{ padding: "12px 16px" }}>
                         {members.length ? (
                           <AvatarStack people={toPeople(members)} size={26} max={4} />
@@ -346,6 +407,7 @@ export function Roles({
         <RoleDetailDrawer
           role={sel}
           members={membersOf(sel)}
+          departmentName={sel.department_id ? deptName.get(sel.department_id) ?? null : null}
           onClose={() => setSel(null)}
           onEdit={() => {
             setEditing(sel);
@@ -357,6 +419,7 @@ export function Roles({
       {editing && (
         <RoleFormDrawer
           role={editing === "new" ? null : editing}
+          departments={departments}
           onClose={() => setEditing(null)}
           onCreate={onCreate}
           onUpdate={onUpdate}

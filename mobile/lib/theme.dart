@@ -32,6 +32,7 @@ class AppColors {
   static const amber100 = Color(0xFFFEF3C7);
 
   static const red = Color(0xFFDC2626);
+  static const red50 = Color(0xFFFEF2F2);
   static const red200 = Color(0xFFFECACA);
 
   static const blue = Color(0xFF2563EB);

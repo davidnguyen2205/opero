@@ -27,83 +27,122 @@ var (
 // sqlc and API types at the store and handler boundaries respectively.
 
 type Department struct {
-	ID        uuid.UUID
-	Name      string
-	ParentID  *uuid.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
-}
-
-type Employee struct {
 	ID             uuid.UUID
-	UserID         *uuid.UUID
-	RoleID         *uuid.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         string
-	HiredAt        *time.Time
+	Name           string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
 }
 
+type Employee struct {
+	ID                    uuid.UUID
+	UserID                *uuid.UUID
+	RoleID                *uuid.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                string
+	HiredAt               *time.Time
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+}
+
 type Role struct {
-	ID          uuid.UUID
-	Name        string
-	Description *string
-	Permissions []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	Name         string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  string
+	Permissions  []string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
 }
 
 type CreateRoleInput struct {
-	Name        string
-	Description *string
-	Permissions []string
+	Name         string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  string
+	Permissions  []string
 }
 
 type UpdateRoleInput struct {
-	Name        *string
-	Description *string
-	Permissions []string
+	Name         *string
+	Description  *string
+	DepartmentID *uuid.UUID
+	AccessLevel  *string
+	Permissions  []string
 }
 
 type CreateDepartmentInput struct {
-	Name     string
-	ParentID *uuid.UUID
+	Name           string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
 }
 
 type UpdateDepartmentInput struct {
-	Name     *string
-	ParentID *uuid.UUID
+	Name           *string
+	ParentID       *uuid.UUID
+	Description    *string
+	LeadEmployeeID *uuid.UUID
+	Icon           *string
+	Color          *string
 }
 
+// Access levels are validated by the DB CHECK constraint (mapped to a 400 in
+// the store), so no separate Go-side allowlist is needed here.
+
 type CreateEmployeeInput struct {
-	UserID         *uuid.UUID
-	RoleID         *uuid.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         string
-	HiredAt        *time.Time
+	UserID                *uuid.UUID
+	RoleID                *uuid.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                string
+	HiredAt               *time.Time
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
 }
 
 type UpdateEmployeeInput struct {
-	FullName       *string
-	EmploymentType *string
-	Email          *string
-	Phone          *string
-	DepartmentID   *uuid.UUID
-	Title          *string
-	Status         *string
-	HiredAt        *time.Time
-	RoleID         *uuid.UUID
+	FullName              *string
+	EmploymentType        *string
+	Email                 *string
+	Phone                 *string
+	DepartmentID          *uuid.UUID
+	Title                 *string
+	Status                *string
+	HiredAt               *time.Time
+	RoleID                *uuid.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             *uuid.UUID
+	EmployeeCode          *string
 }
 
 type EmployeeFilter struct {

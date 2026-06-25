@@ -23,6 +23,16 @@ UPDATE attendance_records SET
 WHERE client_id = $1
 RETURNING *;
 
+-- name: SetAttendanceStatus :one
+-- Toggle break state for an open record. Only moves between checked_in and
+-- on_break (a checked-out/missed record is left unchanged).
+UPDATE attendance_records SET
+    status     = sqlc.arg('status'),
+    updated_at = now()
+WHERE client_id = sqlc.arg('client_id')
+  AND status IN ('checked_in', 'on_break')
+RETURNING *;
+
 -- name: ListAttendanceByShiftIDs :many
 -- Fetch attendance linked to any of the given shifts, regardless of check-in
 -- time (used by the live view to join shifts to their current attendance state

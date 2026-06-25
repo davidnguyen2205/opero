@@ -47,8 +47,12 @@ func (h *Handler) CreateDepartment(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	d, err := h.svc.CreateDepartment(r.Context(), CreateDepartmentInput{
-		Name:     body.Name,
-		ParentID: body.ParentId,
+		Name:           body.Name,
+		ParentID:       body.ParentId,
+		Description:    body.Description,
+		LeadEmployeeID: body.LeadEmployeeId,
+		Icon:           body.Icon,
+		Color:          body.Color,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -73,8 +77,12 @@ func (h *Handler) UpdateDepartment(w http.ResponseWriter, r *http.Request, id oa
 		return
 	}
 	d, err := h.svc.UpdateDepartment(r.Context(), id, UpdateDepartmentInput{
-		Name:     body.Name,
-		ParentID: body.ParentId,
+		Name:           body.Name,
+		ParentID:       body.ParentId,
+		Description:    body.Description,
+		LeadEmployeeID: body.LeadEmployeeId,
+		Icon:           body.Icon,
+		Color:          body.Color,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -120,16 +128,22 @@ func (h *Handler) CreateEmployee(w http.ResponseWriter, r *http.Request) {
 		status = string(*body.Status)
 	}
 	e, err := h.svc.CreateEmployee(r.Context(), CreateEmployeeInput{
-		UserID:         body.UserId,
-		RoleID:         body.RoleId,
-		FullName:       body.FullName,
-		Email:          emailToStr(body.Email),
-		Phone:          body.Phone,
-		EmploymentType: string(body.EmploymentType),
-		DepartmentID:   body.DepartmentId,
-		Title:          body.Title,
-		Status:         status,
-		HiredAt:        dateToTime(body.HiredAt),
+		UserID:                body.UserId,
+		RoleID:                body.RoleId,
+		FullName:              body.FullName,
+		Email:                 emailToStr(body.Email),
+		Phone:                 body.Phone,
+		EmploymentType:        string(body.EmploymentType),
+		DepartmentID:          body.DepartmentId,
+		Title:                 body.Title,
+		Status:                status,
+		HiredAt:               dateToTime(body.HiredAt),
+		Location:              body.Location,
+		Languages:             derefLangs(body.Languages),
+		EmergencyContactName:  body.EmergencyContactName,
+		EmergencyContactPhone: body.EmergencyContactPhone,
+		ReportsTo:             body.ReportsTo,
+		EmployeeCode:          body.EmployeeCode,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -154,15 +168,21 @@ func (h *Handler) UpdateEmployee(w http.ResponseWriter, r *http.Request, id oapi
 		return
 	}
 	e, err := h.svc.UpdateEmployee(r.Context(), id, UpdateEmployeeInput{
-		FullName:       body.FullName,
-		EmploymentType: enumToStrPtr(body.EmploymentType),
-		Email:          emailToStr(body.Email),
-		Phone:          body.Phone,
-		DepartmentID:   body.DepartmentId,
-		Title:          body.Title,
-		Status:         enumToStrPtr(body.Status),
-		HiredAt:        dateToTime(body.HiredAt),
-		RoleID:         body.RoleId,
+		FullName:              body.FullName,
+		EmploymentType:        enumToStrPtr(body.EmploymentType),
+		Email:                 emailToStr(body.Email),
+		Phone:                 body.Phone,
+		DepartmentID:          body.DepartmentId,
+		Title:                 body.Title,
+		Status:                enumToStrPtr(body.Status),
+		HiredAt:               dateToTime(body.HiredAt),
+		RoleID:                body.RoleId,
+		Location:              body.Location,
+		Languages:             derefLangs(body.Languages),
+		EmergencyContactName:  body.EmergencyContactName,
+		EmergencyContactPhone: body.EmergencyContactPhone,
+		ReportsTo:             body.ReportsTo,
+		EmployeeCode:          body.EmployeeCode,
 	})
 	if err != nil {
 		h.writeServiceError(w, r, err)
@@ -200,9 +220,12 @@ func (h *Handler) CreateRole(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
-	in := CreateRoleInput{Name: body.Name, Description: body.Description}
+	in := CreateRoleInput{Name: body.Name, Description: body.Description, DepartmentID: body.DepartmentId}
 	if body.Permissions != nil {
 		in.Permissions = *body.Permissions
+	}
+	if body.AccessLevel != nil {
+		in.AccessLevel = string(*body.AccessLevel)
 	}
 	role, err := h.svc.CreateRole(r.Context(), in)
 	if err != nil {
@@ -227,9 +250,13 @@ func (h *Handler) UpdateRole(w http.ResponseWriter, r *http.Request, id oapi.IdP
 		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
 		return
 	}
-	in := UpdateRoleInput{Name: body.Name, Description: body.Description}
+	in := UpdateRoleInput{Name: body.Name, Description: body.Description, DepartmentID: body.DepartmentId}
 	if body.Permissions != nil {
 		in.Permissions = *body.Permissions
+	}
+	if body.AccessLevel != nil {
+		access := string(*body.AccessLevel)
+		in.AccessLevel = &access
 	}
 	role, err := h.svc.UpdateRole(r.Context(), id, in)
 	if err != nil {
@@ -279,41 +306,70 @@ func (h *Handler) CreateEmployeeLogin(w http.ResponseWriter, r *http.Request, id
 
 func toDepartment(d Department) oapi.Department {
 	return oapi.Department{
-		Id:        d.ID,
-		Name:      d.Name,
-		ParentId:  d.ParentID,
-		CreatedAt: d.CreatedAt,
-		UpdatedAt: d.UpdatedAt,
+		Id:             d.ID,
+		Name:           d.Name,
+		ParentId:       d.ParentID,
+		Description:    d.Description,
+		LeadEmployeeId: d.LeadEmployeeID,
+		Icon:           d.Icon,
+		Color:          d.Color,
+		CreatedAt:      d.CreatedAt,
+		UpdatedAt:      d.UpdatedAt,
 	}
 }
 
 func toRole(r Role) oapi.Role {
 	return oapi.Role{
-		Id:          r.ID,
-		Name:        r.Name,
-		Description: r.Description,
-		Permissions: r.Permissions,
-		CreatedAt:   r.CreatedAt,
-		UpdatedAt:   r.UpdatedAt,
+		Id:           r.ID,
+		Name:         r.Name,
+		Description:  r.Description,
+		DepartmentId: r.DepartmentID,
+		AccessLevel:  oapi.AccessLevel(r.AccessLevel),
+		Permissions:  r.Permissions,
+		CreatedAt:    r.CreatedAt,
+		UpdatedAt:    r.UpdatedAt,
 	}
 }
 
 func toEmployee(e Employee) oapi.Employee {
 	return oapi.Employee{
-		Id:             e.ID,
-		UserId:         e.UserID,
-		RoleId:         e.RoleID,
-		FullName:       e.FullName,
-		Email:          strToEmail(e.Email),
-		Phone:          e.Phone,
-		EmploymentType: oapi.EmployeeEmploymentType(e.EmploymentType),
-		DepartmentId:   e.DepartmentID,
-		Title:          e.Title,
-		Status:         oapi.EmployeeStatus(e.Status),
-		HiredAt:        timeToDate(e.HiredAt),
-		CreatedAt:      e.CreatedAt,
-		UpdatedAt:      e.UpdatedAt,
+		Id:                    e.ID,
+		UserId:                e.UserID,
+		RoleId:                e.RoleID,
+		FullName:              e.FullName,
+		Email:                 strToEmail(e.Email),
+		Phone:                 e.Phone,
+		EmploymentType:        oapi.EmployeeEmploymentType(e.EmploymentType),
+		DepartmentId:          e.DepartmentID,
+		Title:                 e.Title,
+		Status:                oapi.EmployeeStatus(e.Status),
+		HiredAt:               timeToDate(e.HiredAt),
+		Location:              e.Location,
+		Languages:             langsPtr(e.Languages),
+		EmergencyContactName:  e.EmergencyContactName,
+		EmergencyContactPhone: e.EmergencyContactPhone,
+		ReportsTo:             e.ReportsTo,
+		EmployeeCode:          e.EmployeeCode,
+		CreatedAt:             e.CreatedAt,
+		UpdatedAt:             e.UpdatedAt,
 	}
+}
+
+// langsPtr returns nil for an empty slice (so it serialises as omitted), else a pointer.
+func langsPtr(v []string) *[]string {
+	if len(v) == 0 {
+		return nil
+	}
+	return &v
+}
+
+// derefLangs unwraps the optional languages array (nil → nil, meaning "unchanged"
+// on update / empty on create).
+func derefLangs(v *[]string) []string {
+	if v == nil {
+		return nil
+	}
+	return *v
 }
 
 // --- small type converters between generated and domain nullable types ---

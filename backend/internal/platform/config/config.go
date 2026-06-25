@@ -42,6 +42,26 @@ type Config struct {
 	// (comma-separated in CORS_ALLOWED_ORIGINS). Empty = CORS disabled (no
 	// headers emitted), which is the safe default for production.
 	CORSAllowedOrigins []string
+
+	// Storage holds the object-store settings for media uploads (check-in
+	// photos). Backed by MinIO locally; any S3-compatible service in prod.
+	Storage StorageConfig
+}
+
+// StorageConfig holds object-storage (S3/MinIO) settings for media uploads.
+type StorageConfig struct {
+	Endpoint  string
+	AccessKey string
+	SecretKey string
+	Bucket    string
+	UseSSL    bool
+
+	// PublicURL, if set, is used as the base for returned object URLs instead
+	// of presigned GET URLs. Empty = presigned URLs (the local/dev default).
+	PublicURL string
+
+	// PresignExpiry is the validity window for presigned GET URLs.
+	PresignExpiry time.Duration
 }
 
 // Load reads configuration from the environment, applying sensible local
@@ -67,6 +87,20 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("config: invalid JWT_TTL: %w", err)
 	}
 	cfg.JWTTTL = ttl
+
+	presignExpiry, err := time.ParseDuration(getEnv("STORAGE_PRESIGN_EXPIRY", "168h"))
+	if err != nil {
+		return nil, fmt.Errorf("config: invalid STORAGE_PRESIGN_EXPIRY: %w", err)
+	}
+	cfg.Storage = StorageConfig{
+		Endpoint:      getEnv("STORAGE_ENDPOINT", "localhost:9000"),
+		AccessKey:     getEnv("STORAGE_ACCESS_KEY", "opero"),
+		SecretKey:     getEnv("STORAGE_SECRET_KEY", "opero-secret"),
+		Bucket:        getEnv("STORAGE_BUCKET", "opero-media"),
+		UseSSL:        strings.EqualFold(getEnv("STORAGE_USE_SSL", "false"), "true"),
+		PublicURL:     getEnv("STORAGE_PUBLIC_URL", ""),
+		PresignExpiry: presignExpiry,
+	}
 
 	if cfg.DBHost == "" || cfg.DBUser == "" {
 		return nil, fmt.Errorf("config: DB_HOST and DB_USER must not be empty")

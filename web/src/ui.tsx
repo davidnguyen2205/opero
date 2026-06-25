@@ -512,6 +512,33 @@ export function DrawerSectionLabel({ children }: { children: ReactNode }) {
   );
 }
 
+// ── Access levels (role.access_level) ─────────────────────────────────────
+export const ACCESS_LABEL: Record<string, string> = {
+  mobile: "Mobile",
+  web_manager: "Web · Manager",
+  web_admin: "Web · Admin",
+};
+
+export const ACCESS_TONE: Record<string, ChipTone> = {
+  mobile: "neutral",
+  web_manager: "blue",
+  web_admin: "orange",
+};
+
+// ── Leave coverage (approved leave covering a given local day) ─────────────
+// start_date/end_date are inclusive ISO dates (YYYY-MM-DD); compare on the
+// local calendar day so it lines up with the roster grid.
+export function leaveCoversDay(
+  startDate: string,
+  endDate: string,
+  day: Date,
+): boolean {
+  const ymd = `${day.getFullYear()}-${String(day.getMonth() + 1).padStart(2, "0")}-${String(
+    day.getDate(),
+  ).padStart(2, "0")}`;
+  return startDate <= ymd && ymd <= endDate;
+}
+
 // ── Time / text helpers ───────────────────────────────────────────────────
 export function humanize(value: string): string {
   return value.replaceAll("_", " ");

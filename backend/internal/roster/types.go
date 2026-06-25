@@ -36,6 +36,7 @@ type Shift struct {
 	ID         uuid.UUID
 	EmployeeID uuid.UUID
 	LocationID *uuid.UUID
+	TourID     *uuid.UUID
 	StartsAt   time.Time
 	EndsAt     time.Time
 	Notes      *string
@@ -61,6 +62,7 @@ type UpdateLocationInput struct {
 type CreateShiftInput struct {
 	EmployeeID uuid.UUID
 	LocationID *uuid.UUID
+	TourID     *uuid.UUID
 	StartsAt   time.Time
 	EndsAt     time.Time
 	Notes      *string
@@ -69,6 +71,7 @@ type CreateShiftInput struct {
 type UpdateShiftInput struct {
 	EmployeeID *uuid.UUID
 	LocationID *uuid.UUID
+	TourID     *uuid.UUID
 	StartsAt   *time.Time
 	EndsAt     *time.Time
 	Notes      *string

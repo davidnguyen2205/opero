@@ -16,10 +16,12 @@ import (
 	"github.com/davidnguyen2205/opero/backend/internal/identity"
 	"github.com/davidnguyen2205/opero/backend/internal/leave"
 	"github.com/davidnguyen2205/opero/backend/internal/liveview"
+	"github.com/davidnguyen2205/opero/backend/internal/media"
 	"github.com/davidnguyen2205/opero/backend/internal/platform/auth"
 	"github.com/davidnguyen2205/opero/backend/internal/platform/config"
 	"github.com/davidnguyen2205/opero/backend/internal/platform/db"
 	"github.com/davidnguyen2205/opero/backend/internal/platform/httpserver"
+	"github.com/davidnguyen2205/opero/backend/internal/platform/storage"
 	"github.com/davidnguyen2205/opero/backend/internal/roster"
 	"github.com/davidnguyen2205/opero/backend/internal/stats"
 	"github.com/davidnguyen2205/opero/backend/internal/tours"
@@ -84,9 +86,26 @@ func run() error {
 	toursService := tours.NewService(logger)
 	toursHandler := tours.NewHandler(toursService, logger)
 
+	// Object storage for media uploads (check-in photos). Keyed by tenant_id;
+	// no tenant DB pool needed, so /media is secured but not a tenant route.
+	objectStore, err := storage.NewMinioStore(storage.Config{
+		Endpoint:      cfg.Storage.Endpoint,
+		AccessKey:     cfg.Storage.AccessKey,
+		SecretKey:     cfg.Storage.SecretKey,
+		Bucket:        cfg.Storage.Bucket,
+		UseSSL:        cfg.Storage.UseSSL,
+		PublicURL:     cfg.Storage.PublicURL,
+		PresignExpiry: cfg.Storage.PresignExpiry,
+	})
+	if err != nil {
+		return err
+	}
+	mediaHandler := media.NewHandler(objectStore, logger)
+
 	api := &apiHandler{
 		cp: cpHandler, id: identityHandler, rs: rosterHandler, at: attendanceHandler,
 		lv: liveviewHandler, lv2: leaveHandler, st: statsHandler, tr: toursHandler,
+		md: mediaHandler,
 	}
 
 	handler := httpserver.New(httpserver.Deps{

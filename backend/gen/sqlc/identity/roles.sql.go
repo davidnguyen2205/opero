@@ -9,22 +9,31 @@ import (
 	"context"
 
 	"github.com/google/uuid"
+	"github.com/jackc/pgx/v5/pgtype"
 )
 
 const createRole = `-- name: CreateRole :one
-INSERT INTO roles (name, description, permissions)
-VALUES ($1, $2, $3)
-RETURNING id, name, description, permissions, created_at, updated_at
+INSERT INTO roles (name, description, department_id, access_level, permissions)
+VALUES ($1, $2, $3, $4, $5)
+RETURNING id, name, description, permissions, created_at, updated_at, access_level, department_id
 `
 
 type CreateRoleParams struct {
-	Name        string
-	Description *string
-	Permissions []string
+	Name         string
+	Description  *string
+	DepartmentID pgtype.UUID
+	AccessLevel  string
+	Permissions  []string
 }
 
 func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, error) {
-	row := q.db.QueryRow(ctx, createRole, arg.Name, arg.Description, arg.Permissions)
+	row := q.db.QueryRow(ctx, createRole,
+		arg.Name,
+		arg.Description,
+		arg.DepartmentID,
+		arg.AccessLevel,
+		arg.Permissions,
+	)
 	var i Role
 	err := row.Scan(
 		&i.ID,
@@ -33,6 +42,8 @@ func (q *Queries) CreateRole(ctx context.Context, arg CreateRoleParams) (Role, e
 		&i.Permissions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccessLevel,
+		&i.DepartmentID,
 	)
 	return i, err
 }
@@ -50,7 +61,7 @@ func (q *Queries) DeleteRole(ctx context.Context, id uuid.UUID) (int64, error) {
 }
 
 const getRole = `-- name: GetRole :one
-SELECT id, name, description, permissions, created_at, updated_at FROM roles WHERE id = $1
+SELECT id, name, description, permissions, created_at, updated_at, access_level, department_id FROM roles WHERE id = $1
 `
 
 func (q *Queries) GetRole(ctx context.Context, id uuid.UUID) (Role, error) {
@@ -63,12 +74,14 @@ func (q *Queries) GetRole(ctx context.Context, id uuid.UUID) (Role, error) {
 		&i.Permissions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccessLevel,
+		&i.DepartmentID,
 	)
 	return i, err
 }
 
 const listRoles = `-- name: ListRoles :many
-SELECT id, name, description, permissions, created_at, updated_at FROM roles ORDER BY name
+SELECT id, name, description, permissions, created_at, updated_at, access_level, department_id FROM roles ORDER BY name
 `
 
 func (q *Queries) ListRoles(ctx context.Context) ([]Role, error) {
@@ -87,6 +100,8 @@ func (q *Queries) ListRoles(ctx context.Context) ([]Role, error) {
 			&i.Permissions,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.AccessLevel,
+			&i.DepartmentID,
 		); err != nil {
 			return nil, err
 		}
@@ -100,25 +115,31 @@ func (q *Queries) ListRoles(ctx context.Context) ([]Role, error) {
 
 const updateRole = `-- name: UpdateRole :one
 UPDATE roles SET
-    name        = COALESCE($1, name),
-    description = COALESCE($2, description),
-    permissions = COALESCE($3, permissions),
-    updated_at  = now()
-WHERE id = $4
-RETURNING id, name, description, permissions, created_at, updated_at
+    name          = COALESCE($1, name),
+    description   = COALESCE($2, description),
+    department_id = COALESCE($3, department_id),
+    access_level  = COALESCE($4, access_level),
+    permissions   = COALESCE($5, permissions),
+    updated_at    = now()
+WHERE id = $6
+RETURNING id, name, description, permissions, created_at, updated_at, access_level, department_id
 `
 
 type UpdateRoleParams struct {
-	Name        *string
-	Description *string
-	Permissions []string
-	ID          uuid.UUID
+	Name         *string
+	Description  *string
+	DepartmentID pgtype.UUID
+	AccessLevel  *string
+	Permissions  []string
+	ID           uuid.UUID
 }
 
 func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, error) {
 	row := q.db.QueryRow(ctx, updateRole,
 		arg.Name,
 		arg.Description,
+		arg.DepartmentID,
+		arg.AccessLevel,
 		arg.Permissions,
 		arg.ID,
 	)
@@ -130,6 +151,8 @@ func (q *Queries) UpdateRole(ctx context.Context, arg UpdateRoleParams) (Role, e
 		&i.Permissions,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.AccessLevel,
+		&i.DepartmentID,
 	)
 	return i, err
 }

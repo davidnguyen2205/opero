@@ -1,6 +1,6 @@
 -- name: CreateShift :one
-INSERT INTO shifts (employee_id, location_id, starts_at, ends_at, notes, status)
-VALUES ($1, $2, $3, $4, $5, $6)
+INSERT INTO shifts (employee_id, location_id, starts_at, ends_at, notes, status, tour_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
 RETURNING *;
 
 -- name: GetShift :one
@@ -21,6 +21,7 @@ UPDATE shifts SET
     starts_at   = COALESCE(sqlc.narg('starts_at'), starts_at),
     ends_at     = COALESCE(sqlc.narg('ends_at'), ends_at),
     notes       = COALESCE(sqlc.narg('notes'), notes),
+    tour_id     = COALESCE(sqlc.narg('tour_id'), tour_id),
     updated_at  = now()
 WHERE id = sqlc.arg('id')
 RETURNING *;

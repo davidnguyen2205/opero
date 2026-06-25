@@ -20,15 +20,30 @@ type repo interface {
 	CreateTenant(ctx context.Context, name, slug, dbName, plan string) (Tenant, error)
 	GetTenantByID(ctx context.Context, id uuid.UUID) (Tenant, error)
 	GetTenantBySlug(ctx context.Context, slug string) (Tenant, error)
+	ListTenants(ctx context.Context) ([]Tenant, error)
 	SetTenantStatus(ctx context.Context, id uuid.UUID, status string) (Tenant, error)
+	UpdateTenantPlatform(ctx context.Context, id uuid.UUID, name, status, plan *string) (Tenant, error)
 	DeleteTenant(ctx context.Context, id uuid.UUID) error
 	CreateUser(ctx context.Context, tenantID uuid.UUID, email, passwordHash, role, status string) (User, error)
 	DeleteUser(ctx context.Context, id uuid.UUID) error
 	GetUserByID(ctx context.Context, id uuid.UUID) (User, error)
 	GetUserByTenantAndEmail(ctx context.Context, tenantID uuid.UUID, email string) (User, error)
+	ListUsersPlatform(ctx context.Context, tenantID *uuid.UUID, role, status *string) ([]PlatformTenantUser, error)
+	UpdateUserStatusPlatform(ctx context.Context, id uuid.UUID, status string) (User, error)
+	CreatePlatformUser(ctx context.Context, email, passwordHash, role, status string) (PlatformUser, error)
+	GetPlatformUserByID(ctx context.Context, id uuid.UUID) (PlatformUser, error)
+	GetPlatformUserByEmail(ctx context.Context, email string) (PlatformUser, error)
+	ListSubscriptionsPlatform(ctx context.Context, tenantID *uuid.UUID, plan, status *string) ([]PlatformSubscription, error)
+	UpdateSubscriptionPlatform(ctx context.Context, id uuid.UUID, plan, status *string) (PlatformSubscription, error)
+	CreateSuperAdminAuditEvent(ctx context.Context, actorID uuid.UUID, action, targetType string, targetID, tenantID *uuid.UUID, metadata map[string]any) error
+	ListSuperAdminAuditEvents(ctx context.Context, tenantID, actorID *uuid.UUID, action *string, limit int32) ([]SuperAdminAuditEvent, error)
+	CountTenantsByStatus(ctx context.Context) (map[string]int, error)
 }
 
 var validRoles = map[string]bool{"admin": true, "manager": true, "employee": true}
+var validPlatformRoles = map[string]bool{"super_admin": true, "support": true, "ops": true}
+var validUserStatuses = map[string]bool{"active": true, "disabled": true}
+var validTenantStatuses = map[string]bool{"active": true, "suspended": true, "provisioning": true}
 
 type provisioner interface {
 	Create(ctx context.Context, dbName string) error
@@ -37,6 +52,7 @@ type provisioner interface {
 
 type tokenIssuer interface {
 	Issue(userID, tenantID uuid.UUID, role string, now time.Time) (string, time.Time, error)
+	IssuePlatform(platformUserID uuid.UUID, role string, now time.Time) (string, time.Time, error)
 }
 
 // Service holds all control-plane business logic.
@@ -144,6 +160,58 @@ func (s *Service) Login(ctx context.Context, in LoginInput) (AuthResult, error) 
 	return s.issue(user, tenant)
 }
 
+// PlatformLogin authenticates an Opero staff user. It does not resolve or
+// select a tenant database.
+func (s *Service) PlatformLogin(ctx context.Context, in PlatformLoginInput) (PlatformAuthResult, error) {
+	user, err := s.repo.GetPlatformUserByEmail(ctx, strings.TrimSpace(in.Email))
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return PlatformAuthResult{}, ErrInvalidCredentials
+		}
+		return PlatformAuthResult{}, err
+	}
+	if !auth.CheckPassword(user.PasswordHash, in.Password) {
+		return PlatformAuthResult{}, ErrInvalidCredentials
+	}
+	if user.Status != "active" {
+		return PlatformAuthResult{}, ErrInvalidCredentials
+	}
+	return s.issuePlatform(user)
+}
+
+// CurrentPlatformUser returns the authenticated Opero staff user.
+func (s *Service) CurrentPlatformUser(ctx context.Context, platformUserID uuid.UUID) (PlatformUser, error) {
+	return s.repo.GetPlatformUserByID(ctx, platformUserID)
+}
+
+// CreatePlatformUser provisions an Opero staff login. This is intentionally
+// service-only for now; bootstrap/admin CLI code can use it without exposing an
+// API endpoint that creates platform users.
+func (s *Service) CreatePlatformUser(ctx context.Context, email, password, role string) (uuid.UUID, error) {
+	email = strings.TrimSpace(email)
+	if _, err := mail.ParseAddress(email); err != nil {
+		return uuid.Nil, fmt.Errorf("%w: invalid email", ErrValidation)
+	}
+	if len(password) < 12 {
+		return uuid.Nil, fmt.Errorf("%w: platform password must be at least 12 characters", ErrValidation)
+	}
+	if role == "" {
+		role = "support"
+	}
+	if !validPlatformRoles[role] {
+		return uuid.Nil, fmt.Errorf("%w: invalid platform role", ErrValidation)
+	}
+	hash, err := auth.HashPassword(password)
+	if err != nil {
+		return uuid.Nil, err
+	}
+	user, err := s.repo.CreatePlatformUser(ctx, email, hash, role, "active")
+	if err != nil {
+		return uuid.Nil, err
+	}
+	return user.ID, nil
+}
+
 // CreateUser provisions a control-plane login for a tenant and returns its id.
 // Used by the identity module (via the UserCreator interface) to give an
 // employee a login. Returns ErrConflict if the email is already taken.
@@ -191,12 +259,155 @@ func (s *Service) CurrentUser(ctx context.Context, userID uuid.UUID) (CurrentUse
 	return CurrentUserResult{User: user, Tenant: tenant}, nil
 }
 
+func (s *Service) PlatformListTenants(ctx context.Context) ([]Tenant, error) {
+	return s.repo.ListTenants(ctx)
+}
+
+func (s *Service) PlatformGetTenant(ctx context.Context, id uuid.UUID) (Tenant, error) {
+	return s.repo.GetTenantByID(ctx, id)
+}
+
+func (s *Service) PlatformUpdateTenant(ctx context.Context, actorID, id uuid.UUID, name, status, plan *string) (Tenant, error) {
+	name = cleanStringPtr(name)
+	status = cleanStringPtr(status)
+	plan = cleanStringPtr(plan)
+	if name == nil && status == nil && plan == nil {
+		return Tenant{}, fmt.Errorf("%w: at least one field is required", ErrValidation)
+	}
+	if status != nil && !validTenantStatuses[*status] {
+		return Tenant{}, fmt.Errorf("%w: invalid tenant status", ErrValidation)
+	}
+	if name != nil && *name == "" {
+		return Tenant{}, fmt.Errorf("%w: tenant name cannot be empty", ErrValidation)
+	}
+	if plan != nil && *plan == "" {
+		return Tenant{}, fmt.Errorf("%w: plan cannot be empty", ErrValidation)
+	}
+	tenant, err := s.repo.UpdateTenantPlatform(ctx, id, name, status, plan)
+	if err != nil {
+		return Tenant{}, err
+	}
+	metadata := changedFields(name, status, plan)
+	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "tenant.updated", "tenant", &tenant.ID, &tenant.ID, metadata); err != nil {
+		return Tenant{}, err
+	}
+	return tenant, nil
+}
+
+func (s *Service) PlatformListUsers(ctx context.Context, tenantID *uuid.UUID, role, status *string) ([]PlatformTenantUser, error) {
+	role = cleanStringPtr(role)
+	status = cleanStringPtr(status)
+	if role != nil && !validRoles[*role] {
+		return nil, fmt.Errorf("%w: invalid role", ErrValidation)
+	}
+	if status != nil && !validUserStatuses[*status] {
+		return nil, fmt.Errorf("%w: invalid status", ErrValidation)
+	}
+	return s.repo.ListUsersPlatform(ctx, tenantID, role, status)
+}
+
+func (s *Service) PlatformUpdateUser(ctx context.Context, actorID, userID uuid.UUID, status string) (User, error) {
+	status = strings.TrimSpace(status)
+	if !validUserStatuses[status] {
+		return User{}, fmt.Errorf("%w: invalid status", ErrValidation)
+	}
+	user, err := s.repo.UpdateUserStatusPlatform(ctx, userID, status)
+	if err != nil {
+		return User{}, err
+	}
+	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "user.status_updated", "user", &user.ID, &user.TenantID, map[string]any{"status": status}); err != nil {
+		return User{}, err
+	}
+	return user, nil
+}
+
+func (s *Service) PlatformListSubscriptions(ctx context.Context, tenantID *uuid.UUID, plan, status *string) ([]PlatformSubscription, error) {
+	return s.repo.ListSubscriptionsPlatform(ctx, tenantID, cleanStringPtr(plan), cleanStringPtr(status))
+}
+
+func (s *Service) PlatformUpdateSubscription(ctx context.Context, actorID, id uuid.UUID, plan, status *string) (PlatformSubscription, error) {
+	plan = cleanStringPtr(plan)
+	status = cleanStringPtr(status)
+	if plan == nil && status == nil {
+		return PlatformSubscription{}, fmt.Errorf("%w: at least one field is required", ErrValidation)
+	}
+	if plan != nil && *plan == "" {
+		return PlatformSubscription{}, fmt.Errorf("%w: plan cannot be empty", ErrValidation)
+	}
+	if status != nil && *status == "" {
+		return PlatformSubscription{}, fmt.Errorf("%w: status cannot be empty", ErrValidation)
+	}
+	sub, err := s.repo.UpdateSubscriptionPlatform(ctx, id, plan, status)
+	if err != nil {
+		return PlatformSubscription{}, err
+	}
+	tenant, err := s.repo.GetTenantByID(ctx, sub.TenantID)
+	if err != nil {
+		return PlatformSubscription{}, err
+	}
+	sub.TenantName = tenant.Name
+	sub.TenantSlug = tenant.Slug
+	metadata := changedFields(nil, status, plan)
+	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "subscription.updated", "subscription", &sub.ID, &sub.TenantID, metadata); err != nil {
+		return PlatformSubscription{}, err
+	}
+	return sub, nil
+}
+
+func (s *Service) PlatformSystemHealth(ctx context.Context) (SystemHealth, error) {
+	counts, err := s.repo.CountTenantsByStatus(ctx)
+	if err != nil {
+		return SystemHealth{}, err
+	}
+	return SystemHealth{ControlPlane: "ok", TenantsByStatus: counts}, nil
+}
+
+func (s *Service) PlatformListAuditEvents(ctx context.Context, tenantID, actorID *uuid.UUID, action *string, limit int32) ([]SuperAdminAuditEvent, error) {
+	if limit <= 0 {
+		limit = 100
+	}
+	if limit > 200 {
+		limit = 200
+	}
+	return s.repo.ListSuperAdminAuditEvents(ctx, tenantID, actorID, cleanStringPtr(action), limit)
+}
+
 func (s *Service) issue(user User, tenant Tenant) (AuthResult, error) {
 	token, expiresAt, err := s.tokens.Issue(user.ID, tenant.ID, user.Role, s.now())
 	if err != nil {
 		return AuthResult{}, fmt.Errorf("issue token: %w", err)
 	}
 	return AuthResult{Token: token, ExpiresAt: expiresAt, User: user, Tenant: tenant}, nil
+}
+
+func (s *Service) issuePlatform(user PlatformUser) (PlatformAuthResult, error) {
+	token, expiresAt, err := s.tokens.IssuePlatform(user.ID, user.Role, s.now())
+	if err != nil {
+		return PlatformAuthResult{}, fmt.Errorf("issue platform token: %w", err)
+	}
+	return PlatformAuthResult{Token: token, ExpiresAt: expiresAt, User: user}, nil
+}
+
+func cleanStringPtr(value *string) *string {
+	if value == nil {
+		return nil
+	}
+	clean := strings.TrimSpace(*value)
+	return &clean
+}
+
+func changedFields(name, status, plan *string) map[string]any {
+	metadata := map[string]any{}
+	if name != nil {
+		metadata["name"] = *name
+	}
+	if status != nil {
+		metadata["status"] = *status
+	}
+	if plan != nil {
+		metadata["plan"] = *plan
+	}
+	return metadata
 }
 
 // cleanup is best-effort compensation for a failed signup. It only logs

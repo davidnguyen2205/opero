@@ -15,23 +15,31 @@ import (
 const createEmployee = `-- name: CreateEmployee :one
 INSERT INTO employees (
     user_id, full_name, email, phone, employment_type,
-    department_id, title, status, hired_at, role_id
+    department_id, title, status, hired_at, role_id,
+    location, languages, emergency_contact_name, emergency_contact_phone,
+    reports_to, employee_code
 )
-VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)
-RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16)
+RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code
 `
 
 type CreateEmployeeParams struct {
-	UserID         pgtype.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   pgtype.UUID
-	Title          *string
-	Status         string
-	HiredAt        pgtype.Date
-	RoleID         pgtype.UUID
+	UserID                pgtype.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          pgtype.UUID
+	Title                 *string
+	Status                string
+	HiredAt               pgtype.Date
+	RoleID                pgtype.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             pgtype.UUID
+	EmployeeCode          *string
 }
 
 func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) (Employee, error) {
@@ -46,6 +54,12 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		arg.Status,
 		arg.HiredAt,
 		arg.RoleID,
+		arg.Location,
+		arg.Languages,
+		arg.EmergencyContactName,
+		arg.EmergencyContactPhone,
+		arg.ReportsTo,
+		arg.EmployeeCode,
 	)
 	var i Employee
 	err := row.Scan(
@@ -62,6 +76,12 @@ func (q *Queries) CreateEmployee(ctx context.Context, arg CreateEmployeeParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RoleID,
+		&i.Location,
+		&i.Languages,
+		&i.EmergencyContactName,
+		&i.EmergencyContactPhone,
+		&i.ReportsTo,
+		&i.EmployeeCode,
 	)
 	return i, err
 }
@@ -79,7 +99,7 @@ func (q *Queries) DeleteEmployee(ctx context.Context, id uuid.UUID) (int64, erro
 }
 
 const getEmployee = `-- name: GetEmployee :one
-SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id FROM employees WHERE id = $1
+SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code FROM employees WHERE id = $1
 `
 
 func (q *Queries) GetEmployee(ctx context.Context, id uuid.UUID) (Employee, error) {
@@ -99,12 +119,18 @@ func (q *Queries) GetEmployee(ctx context.Context, id uuid.UUID) (Employee, erro
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RoleID,
+		&i.Location,
+		&i.Languages,
+		&i.EmergencyContactName,
+		&i.EmergencyContactPhone,
+		&i.ReportsTo,
+		&i.EmployeeCode,
 	)
 	return i, err
 }
 
 const getEmployeeByUserID = `-- name: GetEmployeeByUserID :one
-SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id FROM employees WHERE user_id = $1
+SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code FROM employees WHERE user_id = $1
 `
 
 func (q *Queries) GetEmployeeByUserID(ctx context.Context, userID pgtype.UUID) (Employee, error) {
@@ -124,12 +150,18 @@ func (q *Queries) GetEmployeeByUserID(ctx context.Context, userID pgtype.UUID) (
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RoleID,
+		&i.Location,
+		&i.Languages,
+		&i.EmergencyContactName,
+		&i.EmergencyContactPhone,
+		&i.ReportsTo,
+		&i.EmployeeCode,
 	)
 	return i, err
 }
 
 const listEmployees = `-- name: ListEmployees :many
-SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id FROM employees
+SELECT id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code FROM employees
 WHERE ($1::uuid IS NULL OR department_id = $1)
   AND ($2::text IS NULL OR status = $2)
 ORDER BY full_name
@@ -163,6 +195,12 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 			&i.CreatedAt,
 			&i.UpdatedAt,
 			&i.RoleID,
+			&i.Location,
+			&i.Languages,
+			&i.EmergencyContactName,
+			&i.EmergencyContactPhone,
+			&i.ReportsTo,
+			&i.EmployeeCode,
 		); err != nil {
 			return nil, err
 		}
@@ -177,7 +215,7 @@ func (q *Queries) ListEmployees(ctx context.Context, arg ListEmployeesParams) ([
 const setEmployeeUserID = `-- name: SetEmployeeUserID :one
 UPDATE employees SET user_id = $2, updated_at = now()
 WHERE id = $1
-RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id
+RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code
 `
 
 type SetEmployeeUserIDParams struct {
@@ -202,6 +240,12 @@ func (q *Queries) SetEmployeeUserID(ctx context.Context, arg SetEmployeeUserIDPa
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RoleID,
+		&i.Location,
+		&i.Languages,
+		&i.EmergencyContactName,
+		&i.EmergencyContactPhone,
+		&i.ReportsTo,
+		&i.EmployeeCode,
 	)
 	return i, err
 }
@@ -217,22 +261,34 @@ UPDATE employees SET
     status          = COALESCE($7, status),
     hired_at        = COALESCE($8, hired_at),
     role_id         = COALESCE($9, role_id),
+    location        = COALESCE($10, location),
+    languages       = COALESCE($11, languages),
+    emergency_contact_name  = COALESCE($12, emergency_contact_name),
+    emergency_contact_phone = COALESCE($13, emergency_contact_phone),
+    reports_to      = COALESCE($14, reports_to),
+    employee_code   = COALESCE($15, employee_code),
     updated_at      = now()
-WHERE id = $10
-RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id
+WHERE id = $16
+RETURNING id, user_id, full_name, email, phone, employment_type, department_id, title, status, hired_at, created_at, updated_at, role_id, location, languages, emergency_contact_name, emergency_contact_phone, reports_to, employee_code
 `
 
 type UpdateEmployeeParams struct {
-	FullName       *string
-	EmploymentType *string
-	Email          *string
-	Phone          *string
-	DepartmentID   pgtype.UUID
-	Title          *string
-	Status         *string
-	HiredAt        pgtype.Date
-	RoleID         pgtype.UUID
-	ID             uuid.UUID
+	FullName              *string
+	EmploymentType        *string
+	Email                 *string
+	Phone                 *string
+	DepartmentID          pgtype.UUID
+	Title                 *string
+	Status                *string
+	HiredAt               pgtype.Date
+	RoleID                pgtype.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             pgtype.UUID
+	EmployeeCode          *string
+	ID                    uuid.UUID
 }
 
 func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) (Employee, error) {
@@ -246,6 +302,12 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		arg.Status,
 		arg.HiredAt,
 		arg.RoleID,
+		arg.Location,
+		arg.Languages,
+		arg.EmergencyContactName,
+		arg.EmergencyContactPhone,
+		arg.ReportsTo,
+		arg.EmployeeCode,
 		arg.ID,
 	)
 	var i Employee
@@ -263,6 +325,12 @@ func (q *Queries) UpdateEmployee(ctx context.Context, arg UpdateEmployeeParams) 
 		&i.CreatedAt,
 		&i.UpdatedAt,
 		&i.RoleID,
+		&i.Location,
+		&i.Languages,
+		&i.EmergencyContactName,
+		&i.EmergencyContactPhone,
+		&i.ReportsTo,
+		&i.EmployeeCode,
 	)
 	return i, err
 }

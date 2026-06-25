@@ -30,27 +30,37 @@ type AttendanceRecord struct {
 }
 
 type Department struct {
-	ID        uuid.UUID
-	Name      string
-	ParentID  pgtype.UUID
-	CreatedAt time.Time
-	UpdatedAt time.Time
+	ID             uuid.UUID
+	Name           string
+	ParentID       pgtype.UUID
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
+	Description    *string
+	LeadEmployeeID pgtype.UUID
+	Icon           *string
+	Color          *string
 }
 
 type Employee struct {
-	ID             uuid.UUID
-	UserID         pgtype.UUID
-	FullName       string
-	Email          *string
-	Phone          *string
-	EmploymentType string
-	DepartmentID   pgtype.UUID
-	Title          *string
-	Status         string
-	HiredAt        pgtype.Date
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
-	RoleID         pgtype.UUID
+	ID                    uuid.UUID
+	UserID                pgtype.UUID
+	FullName              string
+	Email                 *string
+	Phone                 *string
+	EmploymentType        string
+	DepartmentID          pgtype.UUID
+	Title                 *string
+	Status                string
+	HiredAt               pgtype.Date
+	CreatedAt             time.Time
+	UpdatedAt             time.Time
+	RoleID                pgtype.UUID
+	Location              *string
+	Languages             []string
+	EmergencyContactName  *string
+	EmergencyContactPhone *string
+	ReportsTo             pgtype.UUID
+	EmployeeCode          *string
 }
 
 type LeaveBalance struct {
@@ -87,12 +97,14 @@ type Location struct {
 }
 
 type Role struct {
-	ID          uuid.UUID
-	Name        string
-	Description *string
-	Permissions []string
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	ID           uuid.UUID
+	Name         string
+	Description  *string
+	Permissions  []string
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	AccessLevel  string
+	DepartmentID pgtype.UUID
 }
 
 type Shift struct {
@@ -105,6 +117,7 @@ type Shift struct {
 	Status     string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
+	TourID     pgtype.UUID
 }
 
 type Tour struct {

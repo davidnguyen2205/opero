@@ -13,18 +13,29 @@ import (
 )
 
 const createDepartment = `-- name: CreateDepartment :one
-INSERT INTO departments (name, parent_id)
-VALUES ($1, $2)
-RETURNING id, name, parent_id, created_at, updated_at
+INSERT INTO departments (name, parent_id, description, lead_employee_id, icon, color)
+VALUES ($1, $2, $3, $4, $5, $6)
+RETURNING id, name, parent_id, created_at, updated_at, description, lead_employee_id, icon, color
 `
 
 type CreateDepartmentParams struct {
-	Name     string
-	ParentID pgtype.UUID
+	Name           string
+	ParentID       pgtype.UUID
+	Description    *string
+	LeadEmployeeID pgtype.UUID
+	Icon           *string
+	Color          *string
 }
 
 func (q *Queries) CreateDepartment(ctx context.Context, arg CreateDepartmentParams) (Department, error) {
-	row := q.db.QueryRow(ctx, createDepartment, arg.Name, arg.ParentID)
+	row := q.db.QueryRow(ctx, createDepartment,
+		arg.Name,
+		arg.ParentID,
+		arg.Description,
+		arg.LeadEmployeeID,
+		arg.Icon,
+		arg.Color,
+	)
 	var i Department
 	err := row.Scan(
 		&i.ID,
@@ -32,6 +43,10 @@ func (q *Queries) CreateDepartment(ctx context.Context, arg CreateDepartmentPara
 		&i.ParentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.LeadEmployeeID,
+		&i.Icon,
+		&i.Color,
 	)
 	return i, err
 }
@@ -49,7 +64,7 @@ func (q *Queries) DeleteDepartment(ctx context.Context, id uuid.UUID) (int64, er
 }
 
 const getDepartment = `-- name: GetDepartment :one
-SELECT id, name, parent_id, created_at, updated_at FROM departments WHERE id = $1
+SELECT id, name, parent_id, created_at, updated_at, description, lead_employee_id, icon, color FROM departments WHERE id = $1
 `
 
 func (q *Queries) GetDepartment(ctx context.Context, id uuid.UUID) (Department, error) {
@@ -61,12 +76,16 @@ func (q *Queries) GetDepartment(ctx context.Context, id uuid.UUID) (Department, 
 		&i.ParentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.LeadEmployeeID,
+		&i.Icon,
+		&i.Color,
 	)
 	return i, err
 }
 
 const listDepartments = `-- name: ListDepartments :many
-SELECT id, name, parent_id, created_at, updated_at FROM departments ORDER BY name
+SELECT id, name, parent_id, created_at, updated_at, description, lead_employee_id, icon, color FROM departments ORDER BY name
 `
 
 func (q *Queries) ListDepartments(ctx context.Context) ([]Department, error) {
@@ -84,6 +103,10 @@ func (q *Queries) ListDepartments(ctx context.Context) ([]Department, error) {
 			&i.ParentID,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.Description,
+			&i.LeadEmployeeID,
+			&i.Icon,
+			&i.Color,
 		); err != nil {
 			return nil, err
 		}
@@ -97,21 +120,37 @@ func (q *Queries) ListDepartments(ctx context.Context) ([]Department, error) {
 
 const updateDepartment = `-- name: UpdateDepartment :one
 UPDATE departments SET
-    name      = COALESCE($1, name),
-    parent_id = COALESCE($2, parent_id),
-    updated_at = now()
-WHERE id = $3
-RETURNING id, name, parent_id, created_at, updated_at
+    name             = COALESCE($1, name),
+    parent_id        = COALESCE($2, parent_id),
+    description      = COALESCE($3, description),
+    lead_employee_id = COALESCE($4, lead_employee_id),
+    icon             = COALESCE($5, icon),
+    color            = COALESCE($6, color),
+    updated_at       = now()
+WHERE id = $7
+RETURNING id, name, parent_id, created_at, updated_at, description, lead_employee_id, icon, color
 `
 
 type UpdateDepartmentParams struct {
-	Name     *string
-	ParentID pgtype.UUID
-	ID       uuid.UUID
+	Name           *string
+	ParentID       pgtype.UUID
+	Description    *string
+	LeadEmployeeID pgtype.UUID
+	Icon           *string
+	Color          *string
+	ID             uuid.UUID
 }
 
 func (q *Queries) UpdateDepartment(ctx context.Context, arg UpdateDepartmentParams) (Department, error) {
-	row := q.db.QueryRow(ctx, updateDepartment, arg.Name, arg.ParentID, arg.ID)
+	row := q.db.QueryRow(ctx, updateDepartment,
+		arg.Name,
+		arg.ParentID,
+		arg.Description,
+		arg.LeadEmployeeID,
+		arg.Icon,
+		arg.Color,
+		arg.ID,
+	)
 	var i Department
 	err := row.Scan(
 		&i.ID,
@@ -119,6 +158,10 @@ func (q *Queries) UpdateDepartment(ctx context.Context, arg UpdateDepartmentPara
 		&i.ParentID,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.Description,
+		&i.LeadEmployeeID,
+		&i.Icon,
+		&i.Color,
 	)
 	return i, err
 }

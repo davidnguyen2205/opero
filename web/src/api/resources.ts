@@ -7,10 +7,12 @@ export type Department = components["schemas"]["Department"];
 export type Employee = components["schemas"]["Employee"];
 export type Location = components["schemas"]["Location"];
 export type Role = components["schemas"]["Role"];
+export type AccessLevel = components["schemas"]["AccessLevel"];
 export type Shift = components["schemas"]["Shift"];
 export type LiveViewEntry = components["schemas"]["LiveViewEntry"];
 export type LeaveRequest = components["schemas"]["LeaveRequest"];
 export type LeaveStatus = components["schemas"]["LeaveStatus"];
+export type AttendanceRecord = components["schemas"]["AttendanceRecord"];
 export type Tour = components["schemas"]["Tour"];
 export type TourCategory = components["schemas"]["TourCategory"];
 export type CreateTourRequest = components["schemas"]["CreateTourRequest"];
@@ -253,6 +255,19 @@ export const leaveApi = {
     return unwrap(
       await api.POST("/leave/{id}/reject", { params: { path: { id } } }),
       "Unable to reject the request.",
+    );
+  },
+};
+
+// Read-only attendance, used by the employee profile to compute real stats and
+// a recent-activity feed for one employee.
+export const attendanceApi = {
+  async list(
+    filters: { employee_id?: string; from?: string; to?: string } = {},
+  ): Promise<AttendanceRecord[]> {
+    return unwrap(
+      await api.GET("/attendance", { params: { query: filters } }),
+      "Unable to load attendance.",
     );
   },
 };

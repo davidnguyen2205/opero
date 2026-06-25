@@ -14,9 +14,9 @@ import (
 )
 
 const createShift = `-- name: CreateShift :one
-INSERT INTO shifts (employee_id, location_id, starts_at, ends_at, notes, status)
-VALUES ($1, $2, $3, $4, $5, $6)
-RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at
+INSERT INTO shifts (employee_id, location_id, starts_at, ends_at, notes, status, tour_id)
+VALUES ($1, $2, $3, $4, $5, $6, $7)
+RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id
 `
 
 type CreateShiftParams struct {
@@ -26,6 +26,7 @@ type CreateShiftParams struct {
 	EndsAt     time.Time
 	Notes      *string
 	Status     string
+	TourID     pgtype.UUID
 }
 
 func (q *Queries) CreateShift(ctx context.Context, arg CreateShiftParams) (Shift, error) {
@@ -36,6 +37,7 @@ func (q *Queries) CreateShift(ctx context.Context, arg CreateShiftParams) (Shift
 		arg.EndsAt,
 		arg.Notes,
 		arg.Status,
+		arg.TourID,
 	)
 	var i Shift
 	err := row.Scan(
@@ -48,6 +50,7 @@ func (q *Queries) CreateShift(ctx context.Context, arg CreateShiftParams) (Shift
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TourID,
 	)
 	return i, err
 }
@@ -65,7 +68,7 @@ func (q *Queries) DeleteShift(ctx context.Context, id uuid.UUID) (int64, error) 
 }
 
 const getShift = `-- name: GetShift :one
-SELECT id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at FROM shifts WHERE id = $1
+SELECT id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id FROM shifts WHERE id = $1
 `
 
 func (q *Queries) GetShift(ctx context.Context, id uuid.UUID) (Shift, error) {
@@ -81,12 +84,13 @@ func (q *Queries) GetShift(ctx context.Context, id uuid.UUID) (Shift, error) {
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TourID,
 	)
 	return i, err
 }
 
 const listShifts = `-- name: ListShifts :many
-SELECT id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at FROM shifts
+SELECT id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id FROM shifts
 WHERE ($1::uuid IS NULL OR employee_id = $1)
   AND ($2::text IS NULL OR status = $2)
   AND ($3::timestamptz IS NULL OR starts_at >= $3)
@@ -125,6 +129,7 @@ func (q *Queries) ListShifts(ctx context.Context, arg ListShiftsParams) ([]Shift
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.TourID,
 		); err != nil {
 			return nil, err
 		}
@@ -139,7 +144,7 @@ func (q *Queries) ListShifts(ctx context.Context, arg ListShiftsParams) ([]Shift
 const publishShift = `-- name: PublishShift :one
 UPDATE shifts SET status = 'published', updated_at = now()
 WHERE id = $1
-RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at
+RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id
 `
 
 func (q *Queries) PublishShift(ctx context.Context, id uuid.UUID) (Shift, error) {
@@ -155,6 +160,7 @@ func (q *Queries) PublishShift(ctx context.Context, id uuid.UUID) (Shift, error)
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TourID,
 	)
 	return i, err
 }
@@ -166,9 +172,10 @@ UPDATE shifts SET
     starts_at   = COALESCE($3, starts_at),
     ends_at     = COALESCE($4, ends_at),
     notes       = COALESCE($5, notes),
+    tour_id     = COALESCE($6, tour_id),
     updated_at  = now()
-WHERE id = $6
-RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at
+WHERE id = $7
+RETURNING id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id
 `
 
 type UpdateShiftParams struct {
@@ -177,6 +184,7 @@ type UpdateShiftParams struct {
 	StartsAt   pgtype.Timestamptz
 	EndsAt     pgtype.Timestamptz
 	Notes      *string
+	TourID     pgtype.UUID
 	ID         uuid.UUID
 }
 
@@ -187,6 +195,7 @@ func (q *Queries) UpdateShift(ctx context.Context, arg UpdateShiftParams) (Shift
 		arg.StartsAt,
 		arg.EndsAt,
 		arg.Notes,
+		arg.TourID,
 		arg.ID,
 	)
 	var i Shift
@@ -200,6 +209,7 @@ func (q *Queries) UpdateShift(ctx context.Context, arg UpdateShiftParams) (Shift
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.TourID,
 	)
 	return i, err
 }

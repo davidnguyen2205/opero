@@ -1,12 +1,16 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import type { CSSProperties } from "react";
 import type {
   CreateTourRequest,
+  Employee,
+  LiveViewEntry,
+  Shift,
   Tour,
   TourCategory,
   UpdateTourRequest,
 } from "../api/resources";
 import {
+  AvatarStack,
   Btn,
   Card,
   Chip,
@@ -22,7 +26,21 @@ import {
   sortRows,
   useSort,
 } from "../ui";
-import type { ChipTone } from "../ui";
+import type { ChipTone, Person } from "../ui";
+
+// Per-tour derived live/crew data, computed once from live entries + shifts.
+type TourMeta = {
+  liveCount: number; // crew currently checked_in or on_break on this tour
+  crew: Person[]; // employees with a shift for this tour in the displayed week
+};
+
+function startOfWeek(now = new Date()): Date {
+  const d = new Date(now);
+  const day = d.getDay();
+  d.setDate(d.getDate() + (day === 0 ? -6 : 1 - day));
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
 
 const CATEGORIES: TourCategory[] = ["walking", "day_trip", "food", "driving", "evening"];
 
@@ -93,7 +111,30 @@ function MetaItem({ icon, children }: { icon: "clock" | "users" | "route" | "pin
   );
 }
 
-function TourCard({ tour, onSelect }: { tour: Tour; onSelect: () => void }) {
+function LiveBadge({ count }: { count: number }) {
+  return (
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 5,
+        padding: "2px 8px",
+        borderRadius: 9999,
+        fontSize: 11,
+        fontWeight: 700,
+        background: "var(--green-50)",
+        color: "var(--green-700)",
+        border: "1px solid var(--green-200)",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span className="opero-pulse" style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green-500)" }} />
+      {count} live
+    </span>
+  );
+}
+
+function TourCard({ tour, meta, onSelect }: { tour: Tour; meta: TourMeta; onSelect: () => void }) {
   const color = tour.color ?? "#ea580c";
   return (
     <Card hover onClick={onSelect} style={{ overflow: "hidden", opacity: tour.active ? 1 : 0.72, display: "flex", flexDirection: "column" }}>
@@ -111,6 +152,7 @@ function TourCard({ tour, onSelect }: { tour: Tour; onSelect: () => void }) {
               </div>
             )}
           </div>
+          {meta.liveCount > 0 && <LiveBadge count={meta.liveCount} />}
           {!tour.active && <Chip>Paused</Chip>}
         </div>
 
@@ -136,26 +178,65 @@ function TourCard({ tour, onSelect }: { tour: Tour; onSelect: () => void }) {
             €{euros(tour.price_cents)}
           </span>
         </div>
-        <div style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>
-          {tour.departure_times.length} departure{tour.departure_times.length === 1 ? "" : "s"}/day
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minHeight: 30 }}>
+          {meta.crew.length > 0 ? (
+            <AvatarStack people={meta.crew} size={26} max={5} />
+          ) : (
+            <span style={{ fontSize: 11.5, color: "var(--adaptive-400)" }}>No crew assigned this week</span>
+          )}
+          <span style={{ marginLeft: "auto", fontSize: 11.5, color: "var(--adaptive-500)" }}>
+            {tour.departure_times.length} departure{tour.departure_times.length === 1 ? "" : "s"}/day
+          </span>
         </div>
       </div>
     </Card>
   );
 }
 
+// A departure row's derived state from live/assigned crew.
+type DepartureState = "running" | "completed" | "scheduled" | "unstaffed";
+
+const DEP_STATE_LABEL: Record<DepartureState, string> = {
+  running: "Running",
+  completed: "Completed",
+  scheduled: "Scheduled",
+  unstaffed: "Unstaffed",
+};
+
+const DEP_STATE_STYLE: Record<DepartureState, { fg: string; bg: string; bd: string; dot: string }> = {
+  running: { fg: "var(--green-700)", bg: "var(--green-50)", bd: "var(--green-200)", dot: "var(--green-500)" },
+  completed: { fg: "var(--blue-700)", bg: "var(--blue-50)", bd: "var(--blue-200)", dot: "var(--blue-500)" },
+  scheduled: { fg: "var(--adaptive-600)", bg: "var(--adaptive-100)", bd: "var(--adaptive-200)", dot: "var(--adaptive-400)" },
+  unstaffed: { fg: "var(--amber-700)", bg: "var(--amber-50)", bd: "var(--amber-200)", dot: "var(--amber-500)" },
+};
+
+// Parse an "HH:MM" departure string into minutes-from-midnight.
+function depMinutes(t: string): number | null {
+  const m = /^(\d{1,2}):(\d{2})$/.exec(t.trim());
+  if (!m) return null;
+  return Number(m[1]) * 60 + Number(m[2]);
+}
+
 function TourDrawer({
   tour,
+  meta,
+  liveEntries,
   onClose,
   onEdit,
   onDelete,
 }: {
   tour: Tour;
+  meta: TourMeta;
+  // Today's live entries already filtered to this tour's shifts.
+  liveEntries: LiveViewEntry[];
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
 }) {
   const color = tour.color ?? "#ea580c";
+  const anyLive = liveEntries.some(
+    (e) => e.attendance_status === "checked_in" || e.attendance_status === "on_break",
+  );
   return (
     <Drawer
       onClose={onClose}
@@ -168,6 +249,7 @@ function TourDrawer({
             <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 3 }}>
               <Chip tone={CAT_TONE[tour.category]}>{CAT_LABEL[tour.category]}</Chip>
               {tour.rating != null && tour.rating > 0 && <Stars value={tour.rating} />}
+              {meta.liveCount > 0 && <LiveBadge count={meta.liveCount} />}
               {!tour.active && <Chip>Paused</Chip>}
             </div>
           </div>
@@ -191,6 +273,25 @@ function TourDrawer({
     >
       {tour.description && (
         <p style={{ margin: 0, fontSize: 13.5, lineHeight: 1.55, color: "var(--adaptive-600)" }}>{tour.description}</p>
+      )}
+
+      {anyLive && (
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            padding: "11px 14px",
+            borderRadius: 8,
+            background: "var(--green-50)",
+            border: "1px solid var(--green-200)",
+          }}
+        >
+          <span className="opero-pulse" style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--green-500)" }} />
+          <span style={{ fontSize: 13, fontWeight: 600, color: "var(--green-700)" }}>
+            {meta.liveCount} crew on this tour now
+          </span>
+        </div>
       )}
 
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
@@ -232,27 +333,83 @@ function TourDrawer({
 
       <div>
         <DrawerSectionLabel>
-          Daily departures · {tour.departure_times.length}
+          Today's departures · {tour.departure_times.length}
         </DrawerSectionLabel>
         {tour.departure_times.length === 0 ? (
           <div style={{ fontSize: 13, color: "var(--adaptive-500)" }}>No departure times configured.</div>
         ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+            {[...tour.departure_times]
+              .sort((a, b) => (depMinutes(a) ?? 0) - (depMinutes(b) ?? 0))
+              .map((t, i) => {
+                const state = departureState(t, liveEntries);
+                const s = DEP_STATE_STYLE[state];
+                const crew = departureCrew(t, liveEntries);
+                return (
+                  <div
+                    key={i}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 10,
+                      padding: "9px 12px",
+                      borderRadius: 8,
+                      border: "1px solid var(--adaptive-200)",
+                      background: "var(--card)",
+                    }}
+                  >
+                    <span style={{ fontSize: 13, fontWeight: 700, color: "var(--adaptive-900)", fontFeatureSettings: "'tnum'", width: 48 }}>
+                      {t}
+                    </span>
+                    {crew.length > 0 && <AvatarStack people={crew} size={24} max={4} />}
+                    <span
+                      style={{
+                        marginLeft: "auto",
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: 5,
+                        padding: "2px 9px",
+                        borderRadius: 9999,
+                        fontSize: 11,
+                        fontWeight: 600,
+                        color: s.fg,
+                        background: s.bg,
+                        border: `1px solid ${s.bd}`,
+                      }}
+                    >
+                      <span style={{ width: 6, height: 6, borderRadius: "50%", background: s.dot }} />
+                      {DEP_STATE_LABEL[state]}
+                    </span>
+                  </div>
+                );
+              })}
+          </div>
+        )}
+      </div>
+
+      <div>
+        <DrawerSectionLabel>This week's staff · {meta.crew.length}</DrawerSectionLabel>
+        {meta.crew.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--adaptive-500)" }}>No crew assigned this week.</div>
+        ) : (
           <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-            {tour.departure_times.map((t, i) => (
+            {meta.crew.map((p) => (
               <span
-                key={i}
+                key={p.id}
                 style={{
-                  fontSize: 13,
+                  display: "inline-flex",
+                  alignItems: "center",
+                  gap: 6,
+                  fontSize: 12.5,
                   fontWeight: 600,
-                  color: "var(--adaptive-800)",
+                  color: "var(--adaptive-700)",
                   background: "var(--adaptive-50)",
                   border: "1px solid var(--adaptive-200)",
                   borderRadius: 7,
-                  padding: "5px 11px",
-                  fontFeatureSettings: "'tnum'",
+                  padding: "4px 10px",
                 }}
               >
-                {t}
+                {p.name}
               </span>
             ))}
           </div>
@@ -260,6 +417,45 @@ function TourDrawer({
       </div>
     </Drawer>
   );
+}
+
+// The crew (live entries) whose shift window contains a given departure time,
+// matched on the local clock minutes of the departure.
+function departureCrew(t: string, liveEntries: LiveViewEntry[]): Person[] {
+  const dm = depMinutes(t);
+  if (dm == null) return [];
+  return liveEntries
+    .filter((e) => {
+      const start = new Date(e.shift.starts_at);
+      const startMin = start.getHours() * 60 + start.getMinutes();
+      const end = new Date(e.shift.ends_at);
+      const endMin = end.getHours() * 60 + end.getMinutes();
+      return dm >= startMin && dm <= Math.max(endMin, startMin);
+    })
+    .map((e) => ({ id: e.employee_id, name: e.employee_name }));
+}
+
+// Derive a per-departure status from the matched crew's attendance + clock.
+function departureState(t: string, liveEntries: LiveViewEntry[]): DepartureState {
+  const dm = depMinutes(t);
+  const matched = liveEntries.filter((e) => {
+    const start = new Date(e.shift.starts_at);
+    const startMin = start.getHours() * 60 + start.getMinutes();
+    const end = new Date(e.shift.ends_at);
+    const endMin = end.getHours() * 60 + end.getMinutes();
+    return dm != null && dm >= startMin && dm <= Math.max(endMin, startMin);
+  });
+  if (matched.length === 0) {
+    if (dm == null) return "scheduled";
+    const now = new Date();
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+    return nowMin > dm ? "unstaffed" : "scheduled";
+  }
+  if (matched.some((e) => e.attendance_status === "checked_in" || e.attendance_status === "on_break")) {
+    return "running";
+  }
+  if (matched.every((e) => e.attendance_status === "checked_out")) return "completed";
+  return "scheduled";
 }
 
 type FormState = {
@@ -526,11 +722,17 @@ function TourForm({
 
 export function Tours({
   tours,
+  employees,
+  shifts,
+  live,
   onCreate,
   onUpdate,
   onDelete,
 }: {
   tours: Tour[];
+  employees: Employee[];
+  shifts: Shift[];
+  live: LiveViewEntry[];
   onCreate: (body: CreateTourRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateTourRequest) => Promise<void>;
   onDelete: (id: string) => void;
@@ -541,6 +743,37 @@ export function Tours({
   const [editing, setEditing] = useState<Tour | "new" | null>(null);
   const [sort, toggleSort] = useSort("name");
 
+  // Per-tour live count + this-week crew, derived from real data. Live entries
+  // carry their shift (with tour_id); week crew comes from shifts in this week.
+  const metaByTour = useMemo(() => {
+    const empName = new Map(employees.map((e) => [e.id, e.full_name]));
+    const wkStart = startOfWeek().getTime();
+    const wkEnd = wkStart + 7 * 86_400_000;
+    const map = new Map<string, TourMeta>();
+    for (const t of tours) {
+      const liveCount = live.filter(
+        (e) =>
+          e.shift.tour_id === t.id &&
+          (e.attendance_status === "checked_in" || e.attendance_status === "on_break"),
+      ).length;
+      const crewIds = new Set<string>();
+      const crew: Person[] = [];
+      for (const s of shifts) {
+        if (s.tour_id !== t.id) continue;
+        const at = new Date(s.starts_at).getTime();
+        if (at < wkStart || at >= wkEnd) continue;
+        if (crewIds.has(s.employee_id)) continue;
+        crewIds.add(s.employee_id);
+        crew.push({ id: s.employee_id, name: empName.get(s.employee_id) ?? "Staff" });
+      }
+      map.set(t.id, { liveCount, crew });
+    }
+    return map;
+  }, [tours, employees, shifts, live]);
+
+  const metaOf = (t: Tour): TourMeta => metaByTour.get(t.id) ?? { liveCount: 0, crew: [] };
+  const liveOf = (t: Tour): LiveViewEntry[] => live.filter((e) => e.shift.tour_id === t.id);
+
   const filtered = cat === "all" ? tours : tours.filter((t) => t.category === cat);
   const shown = sortRows(filtered, sort, {
     name: (t) => t.name,
@@ -548,6 +781,7 @@ export function Tours({
     duration: (t) => t.duration_min,
     capacity: (t) => t.max_guests,
     departures: (t) => t.departure_times.length,
+    live: (t) => metaOf(t).liveCount,
     price: (t) => t.price_cents,
   });
   const activeCount = tours.filter((t) => t.active).length;
@@ -607,7 +841,7 @@ export function Tours({
       ) : layout === "grid" ? (
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))", gap: 16 }}>
           {shown.map((t) => (
-            <TourCard key={t.id} tour={t} onSelect={() => setSel(t)} />
+            <TourCard key={t.id} tour={t} meta={metaOf(t)} onSelect={() => setSel(t)} />
           ))}
         </div>
       ) : (
@@ -624,6 +858,7 @@ export function Tours({
                       ["Capacity", "capacity"],
                       ["Crew", null],
                       ["Departures", "departures"],
+                      ["Live", "live"],
                       ["Price", "price"],
                       ["", null],
                     ] as const
@@ -664,6 +899,13 @@ export function Tours({
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>{t.max_guests} guests</td>
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-700)" }}>{crewLabel(t)}</td>
                     <td style={{ padding: "11px 16px", color: "var(--adaptive-500)", fontFeatureSettings: "'tnum'" }}>{t.departure_times.join(", ") || "—"}</td>
+                    <td style={{ padding: "11px 16px" }}>
+                      {metaOf(t).liveCount > 0 ? (
+                        <LiveBadge count={metaOf(t).liveCount} />
+                      ) : (
+                        <span style={{ color: "var(--adaptive-400)" }}>—</span>
+                      )}
+                    </td>
                     <td style={{ padding: "11px 16px", fontWeight: 700, color: "var(--adaptive-900)", fontFeatureSettings: "'tnum'", textAlign: "right" }}>€{euros(t.price_cents)}</td>
                     <td style={{ padding: "11px 16px", textAlign: "right" }}>
                       <div style={{ display: "inline-flex", gap: 6 }}>
@@ -682,6 +924,8 @@ export function Tours({
       {sel && (
         <TourDrawer
           tour={sel}
+          meta={metaOf(sel)}
+          liveEntries={liveOf(sel)}
           onClose={() => setSel(null)}
           onEdit={() => {
             setEditing(sel);

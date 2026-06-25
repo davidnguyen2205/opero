@@ -23,9 +23,10 @@
 | **M3** | Roster (locations, shifts CRUD + publish, list by employee/date) | ✅ Done |
 | **M4** | Attendance (check-in/out, geo + photo, offline-idempotent sync) | ✅ Done |
 | **M5** | Manager live view ("who's working now") | ✅ Done |
+| **M6** | Super Admin / platform console (separate platform auth, tenants, subscriptions, audit, health) | 🚧 Backend done, web pending |
 
 **All v1 milestones (M0–M5) are implemented and the quality gates pass.** Remaining work is
-hardening and the deferred v1.1 / phase-2 scope (see end).
+hardening plus the next control-plane Super Admin scope.
 
 ---
 
@@ -73,6 +74,100 @@ hardening and the deferred v1.1 / phase-2 scope (see end).
 
 ---
 
+## M6 — Super Admin / platform console 🚧
+
+Goal: build an internal Opero control-plane surface for managing the SaaS platform itself. Super Admin is separate from tenant admins and must not live inside any tenant database.
+
+### Backend status
+
+- ✅ `platform_users` and `super_admin_audit_events` control-plane migration added.
+- ✅ Platform JWTs use `kind=platform`; tenant JWTs use `kind=tenant`.
+- ✅ `PlatformAuthMiddleware` rejects tenant tokens on `/platform/...` routes.
+- ✅ Platform auth endpoints implemented: `POST /platform/auth/login`, `GET /platform/auth/me`.
+- ✅ Bootstrap CLI added: `go run ./cmd/platform-user -email ... -password ... -role super_admin`.
+- ✅ Platform admin endpoints implemented for tenants, tenant login users, subscriptions, system health, and audit events.
+- ✅ Mutating platform operations write `super_admin_audit_events`.
+- ✅ OpenAPI, oapi-codegen, and sqlc generated code updated.
+- ✅ Backend tests, vet, gofmt, and golangci-lint pass.
+- ⏳ Web `/super-admin` UI is not implemented yet.
+
+### Architecture decisions
+
+- Add `platform_users` in the control-plane DB for Opero staff only.
+- Keep tenant users in existing control-plane `users`; do **not** add `super_admin` to tenant `users.role`.
+- Share low-level `platform/auth` primitives for password hashing and JWT signing/verification.
+- Split business auth:
+  - tenant auth: `/auth/login`, `/auth/me`, `users`, token `kind=tenant`, includes `tenant_id`
+  - platform auth: `/platform/auth/login`, `/platform/auth/me`, `platform_users`, token `kind=platform`, no `tenant_id`
+- Add `PlatformAuthMiddleware`; keep it separate from tenant `AuthMiddleware` + `TenantMiddleware`.
+- Platform routes never resolve a tenant DB implicitly. Any tenant-specific platform access must name the tenant explicitly and write an audit event.
+
+### Control-plane schema
+
+- `platform_users`
+  - `id`
+  - `email`
+  - `password_hash`
+  - `role`: `super_admin` | `support` | `ops`
+  - `status`: `active` | `disabled`
+  - timestamps
+- `super_admin_audit_events`
+  - `id`
+  - `actor_platform_user_id`
+  - `action`
+  - `target_type`
+  - `target_id`
+  - `tenant_id`
+  - `metadata jsonb`
+  - `created_at`
+
+### Initial API surface
+
+- `POST /platform/auth/login`
+- `GET /platform/auth/me`
+- `GET /platform/tenants`
+- `GET /platform/tenants/{id}`
+- `PATCH /platform/tenants/{id}` — status/name/plan changes
+- `GET /platform/users`
+- `PATCH /platform/users/{id}` — disable/enable tenant login users
+- `GET /platform/subscriptions`
+- `PATCH /platform/subscriptions/{id}`
+- `GET /platform/system/health`
+- `GET /platform/audit-events`
+
+### Web surface
+
+- Add a separate `/super-admin` route group.
+- First views:
+  - platform login
+  - tenant directory
+  - tenant detail
+  - platform users / tenant users
+  - subscriptions
+  - system health
+  - audit events
+
+### Implementation order
+
+1. Update `api/openapi.yaml` with platform auth, tenants, users, subscriptions, health, and audit endpoints.
+2. Add control-plane migrations for `platform_users` and `super_admin_audit_events`.
+3. Add sqlc queries for platform auth, tenant listing/detail/update, user status updates, subscriptions, health inputs, and audit event creation/listing.
+4. Generate backend code.
+5. Implement `controlplane/platformauth` and `PlatformAuthMiddleware`.
+6. Implement platform tenant/user/subscription/audit handlers and services.
+7. Add unit and integration tests for platform login, middleware rejection of tenant tokens, tenant listing, status updates, and audit writes.
+8. Regenerate web client types and build the `/super-admin` UI.
+9. Run backend quality gates and web build.
+
+### Future additions
+
+- Read-only support mode with mandatory reason and audit event.
+- Provisioning step/event table for detailed retry/status visibility.
+- Cross-tenant aggregate usage metrics.
+- Stripe/payment integration when billing is no longer manual.
+
+---
+
 ## Clients
 
 - **Web** (`web/`, React + TS + Vite): full manager UI in `src/App.tsx` — Live, Roster, People, Departments, Roles, Locations; signup/login; CRUD + publish. Typed client generated from `openapi.yaml`.
@@ -99,4 +194,4 @@ These are not known failures — they are things **not yet verified in this pass
 ## Out of scope for v1 (do not build now)
 
 - **v1.1**: leave management (`leave_requests`, `leave_balances`), document/cert tracking (`documents`). Schema leaves room; not implemented.
-- **Phase 2**: payroll, cross-tenant analytics/insights, in-product AI assistant (tool-calling over the existing REST API — keep operationIds/descriptions clean for this).
+- **Phase 2**: payroll, advanced cross-tenant analytics/insights, in-product AI assistant (tool-calling over the existing REST API — keep operationIds/descriptions clean for this).

@@ -79,7 +79,7 @@ class _ShellState extends State<Shell> {
           activeClientId: widget.attendance.activeClientId,
         ),
         const InboxScreen(),
-        ProfileScreen(auth: widget.auth, onSignOut: _signOut),
+        ProfileScreen(api: widget.api, auth: widget.auth, onSignOut: _signOut),
       ],
     );
 

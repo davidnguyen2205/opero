@@ -21,6 +21,9 @@ type fakeRepo struct {
 	tenantsBySlug      map[string]Tenant
 	usersByID          map[uuid.UUID]User
 	usersByTenantEmail map[string]User
+	platformUsersByID  map[uuid.UUID]PlatformUser
+	platformUsersEmail map[string]PlatformUser
+	auditEvents        []SuperAdminAuditEvent
 }
 
 func newFakeRepo() *fakeRepo {
@@ -29,6 +32,8 @@ func newFakeRepo() *fakeRepo {
 		tenantsBySlug:      map[string]Tenant{},
 		usersByID:          map[uuid.UUID]User{},
 		usersByTenantEmail: map[string]User{},
+		platformUsersByID:  map[uuid.UUID]PlatformUser{},
+		platformUsersEmail: map[string]PlatformUser{},
 	}
 }
 
@@ -60,12 +65,39 @@ func (f *fakeRepo) GetTenantBySlug(_ context.Context, slug string) (Tenant, erro
 	return Tenant{}, ErrNotFound
 }
 
+func (f *fakeRepo) ListTenants(context.Context) ([]Tenant, error) {
+	out := make([]Tenant, 0, len(f.tenantsByID))
+	for _, tenant := range f.tenantsByID {
+		out = append(out, tenant)
+	}
+	return out, nil
+}
+
 func (f *fakeRepo) SetTenantStatus(_ context.Context, id uuid.UUID, status string) (Tenant, error) {
 	t, ok := f.tenantsByID[id]
 	if !ok {
 		return Tenant{}, ErrNotFound
 	}
 	t.Status = status
+	f.tenantsByID[id] = t
+	f.tenantsBySlug[t.Slug] = t
+	return t, nil
+}
+
+func (f *fakeRepo) UpdateTenantPlatform(_ context.Context, id uuid.UUID, name, status, plan *string) (Tenant, error) {
+	t, ok := f.tenantsByID[id]
+	if !ok {
+		return Tenant{}, ErrNotFound
+	}
+	if name != nil {
+		t.Name = *name
+	}
+	if status != nil {
+		t.Status = *status
+	}
+	if plan != nil {
+		t.Plan = *plan
+	}
 	f.tenantsByID[id] = t
 	f.tenantsBySlug[t.Slug] = t
 	return t, nil
@@ -105,11 +137,96 @@ func (f *fakeRepo) GetUserByID(_ context.Context, id uuid.UUID) (User, error) {
 	return User{}, ErrNotFound
 }
 
+func (f *fakeRepo) ListUsersPlatform(_ context.Context, tenantID *uuid.UUID, role, status *string) ([]PlatformTenantUser, error) {
+	var out []PlatformTenantUser
+	for _, user := range f.usersByID {
+		if tenantID != nil && user.TenantID != *tenantID {
+			continue
+		}
+		if role != nil && user.Role != *role {
+			continue
+		}
+		if status != nil && user.Status != *status {
+			continue
+		}
+		tenant := f.tenantsByID[user.TenantID]
+		out = append(out, PlatformTenantUser{
+			ID: user.ID, TenantID: user.TenantID, TenantName: tenant.Name,
+			TenantSlug: tenant.Slug, Email: user.Email, Role: user.Role, Status: user.Status,
+		})
+	}
+	return out, nil
+}
+
+func (f *fakeRepo) UpdateUserStatusPlatform(_ context.Context, id uuid.UUID, status string) (User, error) {
+	user, ok := f.usersByID[id]
+	if !ok {
+		return User{}, ErrNotFound
+	}
+	user.Status = status
+	f.usersByID[id] = user
+	f.usersByTenantEmail[userKey(user.TenantID, user.Email)] = user
+	return user, nil
+}
+
 func (f *fakeRepo) GetUserByTenantAndEmail(_ context.Context, tenantID uuid.UUID, email string) (User, error) {
 	if u, ok := f.usersByTenantEmail[userKey(tenantID, email)]; ok {
 		return u, nil
 	}
 	return User{}, ErrNotFound
+}
+
+func (f *fakeRepo) CreatePlatformUser(_ context.Context, email, hash, role, status string) (PlatformUser, error) {
+	key := strings.ToLower(email)
+	if _, ok := f.platformUsersEmail[key]; ok {
+		return PlatformUser{}, ErrConflict
+	}
+	user := PlatformUser{ID: uuid.New(), Email: email, Role: role, Status: status, PasswordHash: hash}
+	f.platformUsersByID[user.ID] = user
+	f.platformUsersEmail[key] = user
+	return user, nil
+}
+
+func (f *fakeRepo) GetPlatformUserByID(_ context.Context, id uuid.UUID) (PlatformUser, error) {
+	if user, ok := f.platformUsersByID[id]; ok {
+		return user, nil
+	}
+	return PlatformUser{}, ErrNotFound
+}
+
+func (f *fakeRepo) GetPlatformUserByEmail(_ context.Context, email string) (PlatformUser, error) {
+	if user, ok := f.platformUsersEmail[strings.ToLower(email)]; ok {
+		return user, nil
+	}
+	return PlatformUser{}, ErrNotFound
+}
+
+func (f *fakeRepo) ListSubscriptionsPlatform(context.Context, *uuid.UUID, *string, *string) ([]PlatformSubscription, error) {
+	return nil, nil
+}
+
+func (f *fakeRepo) UpdateSubscriptionPlatform(context.Context, uuid.UUID, *string, *string) (PlatformSubscription, error) {
+	return PlatformSubscription{}, ErrNotFound
+}
+
+func (f *fakeRepo) CreateSuperAdminAuditEvent(_ context.Context, actorID uuid.UUID, action, targetType string, targetID, tenantID *uuid.UUID, metadata map[string]any) error {
+	f.auditEvents = append(f.auditEvents, SuperAdminAuditEvent{
+		ID: uuid.New(), ActorPlatformUserID: actorID, Action: action,
+		TargetType: targetType, TargetID: targetID, TenantID: tenantID, Metadata: metadata,
+	})
+	return nil
+}
+
+func (f *fakeRepo) ListSuperAdminAuditEvents(context.Context, *uuid.UUID, *uuid.UUID, *string, int32) ([]SuperAdminAuditEvent, error) {
+	return f.auditEvents, nil
+}
+
+func (f *fakeRepo) CountTenantsByStatus(context.Context) (map[string]int, error) {
+	counts := map[string]int{}
+	for _, tenant := range f.tenantsByID {
+		counts[tenant.Status]++
+	}
+	return counts, nil
 }
 
 type fakeProvisioner struct {
@@ -258,5 +375,62 @@ func TestCurrentUser(t *testing.T) {
 
 	if _, err := svc.CurrentUser(context.Background(), uuid.New()); !errors.Is(err, ErrNotFound) {
 		t.Errorf("unknown user err = %v, want ErrNotFound", err)
+	}
+}
+
+func TestPlatformLogin(t *testing.T) {
+	svc, repo, _ := newTestService()
+	id, err := svc.CreatePlatformUser(context.Background(), "ops@opero.test", "long-password", "super_admin")
+	if err != nil {
+		t.Fatalf("CreatePlatformUser: %v", err)
+	}
+
+	res, err := svc.PlatformLogin(context.Background(), PlatformLoginInput{
+		Email:    "ops@opero.test",
+		Password: "long-password",
+	})
+	if err != nil {
+		t.Fatalf("PlatformLogin: %v", err)
+	}
+	if res.Token == "" {
+		t.Fatal("expected platform token")
+	}
+	if res.User.ID != id {
+		t.Fatalf("user id = %v, want %v", res.User.ID, id)
+	}
+
+	user := repo.platformUsersByID[id]
+	user.Status = "disabled"
+	repo.platformUsersByID[id] = user
+	repo.platformUsersEmail[strings.ToLower(user.Email)] = user
+	if _, err := svc.PlatformLogin(context.Background(), PlatformLoginInput{Email: user.Email, Password: "long-password"}); !errors.Is(err, ErrInvalidCredentials) {
+		t.Fatalf("disabled platform user err = %v, want ErrInvalidCredentials", err)
+	}
+}
+
+func TestPlatformUpdateTenantWritesAudit(t *testing.T) {
+	svc, repo, _ := newTestService()
+	res, err := svc.Signup(context.Background(), signupInput())
+	if err != nil {
+		t.Fatalf("Signup: %v", err)
+	}
+	actorID, err := svc.CreatePlatformUser(context.Background(), "ops@opero.test", "long-password", "ops")
+	if err != nil {
+		t.Fatalf("CreatePlatformUser: %v", err)
+	}
+
+	status := "suspended"
+	tenant, err := svc.PlatformUpdateTenant(context.Background(), actorID, res.Tenant.ID, nil, &status, nil)
+	if err != nil {
+		t.Fatalf("PlatformUpdateTenant: %v", err)
+	}
+	if tenant.Status != "suspended" {
+		t.Fatalf("status = %q, want suspended", tenant.Status)
+	}
+	if len(repo.auditEvents) != 1 {
+		t.Fatalf("audit event count = %d, want 1", len(repo.auditEvents))
+	}
+	if repo.auditEvents[0].Action != "tenant.updated" {
+		t.Fatalf("audit action = %q", repo.auditEvents[0].Action)
 	}
 }

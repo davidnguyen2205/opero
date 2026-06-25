@@ -34,9 +34,11 @@ type Entry struct {
 	EmployeeID       uuid.UUID
 	EmployeeName     string
 	Shift            roster.Shift
-	AttendanceStatus string // not_checked_in | checked_in | checked_out
+	AttendanceStatus string // not_checked_in | checked_in | on_break | checked_out
 	CheckInAt        *time.Time
 	CheckOutAt       *time.Time
+	CheckInLat       *float64
+	CheckInLng       *float64
 }
 
 type Service struct {
@@ -99,6 +101,8 @@ func (s *Service) LiveView(ctx context.Context, from, to time.Time) ([]Entry, er
 			e.AttendanceStatus = rec.Status
 			e.CheckInAt = rec.CheckInAt
 			e.CheckOutAt = rec.CheckOutAt
+			e.CheckInLat = rec.CheckInLat
+			e.CheckInLng = rec.CheckInLng
 		}
 		entries = append(entries, e)
 	}

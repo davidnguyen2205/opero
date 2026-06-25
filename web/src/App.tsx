@@ -338,7 +338,19 @@ function Sidebar({
   );
 }
 
-function TopBar({ view, loading, onRefresh }: { view: View; loading: boolean; onRefresh: () => void }) {
+function TopBar({
+  view,
+  crumb,
+  onCrumbRoot,
+  loading,
+  onRefresh,
+}: {
+  view: View;
+  crumb?: string | null;
+  onCrumbRoot?: () => void;
+  loading: boolean;
+  onRefresh: () => void;
+}) {
   return (
     <header
       style={{
@@ -356,7 +368,28 @@ function TopBar({ view, loading, onRefresh }: { view: View; loading: boolean; on
       <div style={{ display: "flex", alignItems: "center", gap: 9, fontSize: 13, color: "var(--adaptive-500)" }}>
         <span>{PEOPLE_VIEWS.includes(view) ? "People" : "Operations"}</span>
         <Icon name="chevron" size={14} color="var(--adaptive-300)" />
-        <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{TITLES[view]}</span>
+        {crumb ? (
+          <>
+            <button
+              onClick={onCrumbRoot}
+              style={{
+                border: 0,
+                background: "none",
+                padding: 0,
+                cursor: "pointer",
+                fontFamily: "inherit",
+                fontSize: 13,
+                color: "var(--adaptive-500)",
+              }}
+            >
+              {TITLES[view]}
+            </button>
+            <Icon name="chevron" size={14} color="var(--adaptive-300)" />
+            <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{crumb}</span>
+          </>
+        ) : (
+          <span style={{ color: "var(--adaptive-900)", fontWeight: 600 }}>{TITLES[view]}</span>
+        )}
       </div>
       <div style={{ flex: 1 }} />
       <div
@@ -587,10 +620,22 @@ export function App() {
         onSignOut={signOut}
       />
       <main style={{ flex: 1, display: "flex", flexDirection: "column", minWidth: 0, background: "var(--background)" }}>
-        <TopBar view={view} loading={loading} onRefresh={() => void loadData()} />
+        <TopBar
+          view={view}
+          crumb={view === "people" && selectedEmployee ? selectedEmployee.full_name : null}
+          onCrumbRoot={() => setSelectedEmployee(null)}
+          loading={loading}
+          onRefresh={() => void loadData()}
+        />
         <div style={{ flex: 1, overflow: "auto", background: "var(--background)" }}>
           {view === "live" && (
-            <LiveView entries={live} locationNames={locationNames} onRefresh={() => void loadData()} loading={loading} />
+            <LiveView
+              entries={live}
+              leaveRequests={leaveRequests}
+              locationNames={locationNames}
+              onRefresh={() => void loadData()}
+              loading={loading}
+            />
           )}
           {view === "roster" && (
             <Roster
@@ -598,6 +643,8 @@ export function App() {
               locations={locations}
               departments={departments}
               shifts={shifts}
+              tours={tours}
+              leaveRequests={leaveRequests}
               locationNames={locationNames}
               onCreate={(body) => runMutation(async () => void (await shiftsApi.create(body)), "Draft shift added.")}
               onUpdate={(id, body) => runMutation(async () => void (await shiftsApi.update(id, body)), "Shift updated.")}
@@ -615,6 +662,9 @@ export function App() {
           {view === "tours" && (
             <Tours
               tours={tours}
+              employees={employees}
+              shifts={shifts}
+              live={live}
               onCreate={(body) => runMutation(async () => void (await toursApi.create(body)), "Tour created.")}
               onUpdate={(id, body) => runMutation(async () => void (await toursApi.update(id, body)), "Tour updated.")}
               onDelete={(id) => void runMutation(async () => await toursApi.delete(id), "Tour deleted.")}
@@ -633,12 +683,26 @@ export function App() {
                 employee={selectedEmployee}
                 shifts={shifts}
                 live={live}
+                leaveRequests={leaveRequests}
                 locationNames={locationNames}
                 departmentName={
                   selectedEmployee.department_id ? departmentNames.get(selectedEmployee.department_id) ?? null : null
                 }
                 roleName={selectedEmployee.role_id ? roleNames.get(selectedEmployee.role_id) ?? null : null}
-                onBack={() => setSelectedEmployee(null)}
+                roleAccessLevel={
+                  selectedEmployee.role_id
+                    ? roles.find((r) => r.id === selectedEmployee.role_id)?.access_level ?? null
+                    : null
+                }
+                reportsToName={
+                  selectedEmployee.reports_to
+                    ? employees.find((e) => e.id === selectedEmployee.reports_to)?.full_name ?? null
+                    : null
+                }
+                onNavigate={(v) => {
+                  setSelectedEmployee(null);
+                  setView(v);
+                }}
               />
             ) : (
               <People
@@ -666,6 +730,7 @@ export function App() {
             <Roles
               roles={roles}
               employees={employees}
+              departments={departments}
               onCreate={(body) => runMutation(async () => void (await rolesApi.create(body)), "Role created.")}
               onUpdate={(id, body) => runMutation(async () => void (await rolesApi.update(id, body)), "Role updated.")}
               onDelete={(id) => void runMutation(async () => await rolesApi.delete(id), "Role deleted.")}

@@ -128,6 +128,17 @@ func (s *Store) CheckOut(ctx context.Context, in CheckOutInput) (Record, error) 
 	return recordFromDB(a), nil
 }
 
+func (s *Store) SetStatus(ctx context.Context, clientID uuid.UUID, status string) (Record, error) {
+	a, err := s.q.SetAttendanceStatus(ctx, attendancedb.SetAttendanceStatusParams{
+		ClientID: clientID,
+		Status:   status,
+	})
+	if err != nil {
+		return Record{}, fmt.Errorf("set attendance status: %w", mapErr(err))
+	}
+	return recordFromDB(a), nil
+}
+
 // ListByShiftIDs returns attendance records linked to any of the given shifts,
 // independent of check-in time. Used by the live view's shift⋈attendance join.
 func (s *Store) ListByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) ([]Record, error) {
