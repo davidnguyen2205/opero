@@ -2,13 +2,24 @@ import { useEffect, useState } from "react";
 import type { CSSProperties, ReactNode } from "react";
 import {
   attendanceApi,
+  type AccessLevel,
   type AttendanceRecord,
   type Employee,
   type LeaveRequest,
   type LiveViewEntry,
   type Shift,
 } from "../api/resources";
-import { Avatar, Btn, Chip, Icon, StatusChip, colorForId, formatTime, humanize } from "../ui";
+import {
+  ACCESS_LABEL,
+  Avatar,
+  Btn,
+  Chip,
+  Icon,
+  StatusChip,
+  colorForId,
+  formatTime,
+  humanize,
+} from "../ui";
 import type { ChipTone, IconName, LiveStatus } from "../ui";
 
 const TYPE_TONE: Record<Employee["employment_type"], ChipTone> = {
@@ -109,6 +120,8 @@ export function EmployeeDetail({
   locationNames,
   departmentName,
   roleName,
+  roleAccessLevel,
+  reportsToName,
   onNavigate,
 }: {
   employee: Employee;
@@ -118,6 +131,8 @@ export function EmployeeDetail({
   locationNames: Map<string, string>;
   departmentName: string | null;
   roleName: string | null;
+  roleAccessLevel: AccessLevel | null;
+  reportsToName: string | null;
   onNavigate: (view: "roster" | "departments" | "roles") => void;
 }) {
   const [attendance, setAttendance] = useState<AttendanceRecord[]>([]);
@@ -267,6 +282,10 @@ export function EmployeeDetail({
                 </Chip>
               )}
               {employee.title && <Chip>{employee.title}</Chip>}
+              {employee.employee_code && <Chip>{employee.employee_code}</Chip>}
+              {(employee.languages ?? []).map((lang) => (
+                <Chip key={lang}>{lang}</Chip>
+              ))}
             </div>
           </div>
           <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
@@ -410,6 +429,18 @@ export function EmployeeDetail({
             <div>
               <FieldRow icon="send" label="Email" value={employee.email ?? "—"} />
               <FieldRow icon="phone" label="Phone" value={employee.phone ?? "—"} />
+              <FieldRow icon="pin" label="Location" value={employee.location ?? "—"} />
+              <FieldRow
+                icon="alert"
+                label="Emergency"
+                value={
+                  employee.emergency_contact_name
+                    ? employee.emergency_contact_phone
+                      ? `${employee.emergency_contact_name} · ${employee.emergency_contact_phone}`
+                      : employee.emergency_contact_name
+                    : employee.emergency_contact_phone ?? "—"
+                }
+              />
             </div>
           </div>
 
@@ -426,6 +457,8 @@ export function EmployeeDetail({
                     : "—"
                 }
               />
+              <FieldRow icon="users" label="Reports to" value={reportsToName ?? "—"} />
+              <FieldRow icon="phone" label="Employee ID" value={employee.employee_code ?? "—"} />
             </div>
           </div>
 
@@ -439,6 +472,12 @@ export function EmployeeDetail({
                 onClick={() => onNavigate("departments")}
               />
               <NavRow icon="route" label="Role" value={roleName ?? "None"} onClick={() => onNavigate("roles")} />
+              {roleAccessLevel && (
+                <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "2px 2px" }}>
+                  <span style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>Access level</span>
+                  <Chip tone="blue">{ACCESS_LABEL[roleAccessLevel] ?? roleAccessLevel}</Chip>
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { LiveViewEntry } from "../api/resources";
+import type { LeaveRequest, LiveViewEntry } from "../api/resources";
 import {
   Avatar,
   Btn,
@@ -11,16 +11,20 @@ import {
   StatusChip,
   fmtDur,
   formatTime,
+  initials,
+  leaveCoversDay,
   minutesBetween,
 } from "../ui";
 import type { LiveStatus } from "../ui";
 
-// The API exposes only not_checked_in / checked_in / checked_out. We derive the
-// richer board statuses from that plus the shift's scheduled start.
+// The API exposes not_checked_in / checked_in / on_break / checked_out. We
+// derive the richer board statuses from that plus the shift's scheduled start.
 function deriveStatus(entry: LiveViewEntry, nowMs: number): LiveStatus {
   switch (entry.attendance_status) {
     case "checked_in":
       return "working";
+    case "on_break":
+      return "break";
     case "checked_out":
       return "done";
     default:
@@ -30,7 +34,7 @@ function deriveStatus(entry: LiveViewEntry, nowMs: number): LiveStatus {
 
 type Row = LiveViewEntry & { _status: LiveStatus };
 
-type Layout = "board" | "list";
+type Layout = "board" | "list" | "map";
 
 function Seg({
   value,
@@ -39,9 +43,10 @@ function Seg({
   value: Layout;
   onChange: (v: Layout) => void;
 }) {
-  const options: { id: Layout; label: string; icon: "grid" | "list" }[] = [
+  const options: { id: Layout; label: string; icon: "grid" | "list" | "map" }[] = [
     { id: "board", label: "Board", icon: "grid" },
     { id: "list", label: "List", icon: "list" },
+    { id: "map", label: "Map", icon: "map" },
   ];
   return (
     <div
@@ -113,6 +118,30 @@ function KpiCard({
       <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
         <span style={{ width: 9, height: 9, borderRadius: "50%", background: dot }} />
         <span style={{ fontSize: 12, fontWeight: 500, color: "var(--adaptive-600)" }}>{label}</span>
+      </div>
+      <div
+        style={{
+          fontSize: 26,
+          fontWeight: 700,
+          color: "var(--adaptive-900)",
+          letterSpacing: "-0.02em",
+          fontFeatureSettings: "'tnum'",
+        }}
+      >
+        {value}
+      </div>
+    </Card>
+  );
+}
+
+// Non-interactive KPI fed by approved leave covering today (not a board status,
+// so it isn't a clickable filter).
+function LeaveKpi({ value }: { value: number }) {
+  return (
+    <Card style={{ flex: 1, minWidth: 130, padding: "12px 14px", background: "var(--adaptive-50)" }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
+        <Icon name="sun" size={14} color="var(--adaptive-400)" />
+        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--adaptive-600)" }}>On leave</span>
       </div>
       <div
         style={{
@@ -240,6 +269,7 @@ function Board({
 }) {
   const cols: { status: LiveStatus; label: string }[] = [
     { status: "working", label: "On shift" },
+    { status: "break", label: "On break" },
     { status: "late", label: "Not checked in" },
     { status: "upcoming", label: "Upcoming today" },
     { status: "done", label: "Checked out" },
@@ -386,6 +416,158 @@ function ListView({
   );
 }
 
+// Map layout: plots check-in coordinates, normalized to the points' bounding
+// box, in a stylized panel. Only in-the-field crew (with coordinates) appear.
+function MapView({
+  rows,
+  locationName,
+  onSelect,
+}: {
+  rows: Row[];
+  locationName: (id?: string | null) => string;
+  onSelect: (r: Row) => void;
+}) {
+  const pinned = rows.filter((r) => r.check_in_lat != null && r.check_in_lng != null);
+
+  const lats = pinned.map((r) => r.check_in_lat as number);
+  const lngs = pinned.map((r) => r.check_in_lng as number);
+  const minLat = Math.min(...lats);
+  const maxLat = Math.max(...lats);
+  const minLng = Math.min(...lngs);
+  const maxLng = Math.max(...lngs);
+  const spanLat = maxLat - minLat || 1;
+  const spanLng = maxLng - minLng || 1;
+
+  // Normalize to 6%–94% so pins never sit on the panel edge. Latitude is
+  // inverted (north = up).
+  function pos(r: Row): { left: string; top: string } {
+    const x = pinned.length === 1 ? 0.5 : (((r.check_in_lng as number) - minLng) / spanLng);
+    const y = pinned.length === 1 ? 0.5 : (((r.check_in_lat as number) - minLat) / spanLat);
+    return { left: `${6 + x * 88}%`, top: `${6 + (1 - y) * 88}%` };
+  }
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) minmax(0, 1fr)", gap: 16, alignItems: "stretch" }}>
+      <Card style={{ overflow: "hidden", position: "relative", minHeight: 420 }}>
+        {/* stylized map backdrop */}
+        <div
+          style={{
+            position: "absolute",
+            inset: 0,
+            background:
+              "linear-gradient(135deg, var(--adaptive-50), var(--adaptive-100))",
+            backgroundImage:
+              "linear-gradient(var(--adaptive-200) 1px, transparent 1px), linear-gradient(90deg, var(--adaptive-200) 1px, transparent 1px)",
+            backgroundSize: "44px 44px",
+            opacity: 0.6,
+          }}
+        />
+        {pinned.length === 0 ? (
+          <div
+            style={{
+              position: "relative",
+              minHeight: 420,
+              display: "grid",
+              placeItems: "center",
+              color: "var(--adaptive-500)",
+              textAlign: "center",
+              padding: 24,
+            }}
+          >
+            No check-in locations to plot yet.
+          </div>
+        ) : (
+          pinned.map((r) => {
+            const s = STATUS[r._status];
+            const p = pos(r);
+            return (
+              <button
+                key={r.shift.id}
+                onClick={() => onSelect(r)}
+                title={`${r.employee_name} · ${s.label}`}
+                style={{
+                  position: "absolute",
+                  left: p.left,
+                  top: p.top,
+                  transform: "translate(-50%, -50%)",
+                  width: 38,
+                  height: 38,
+                  borderRadius: "50%",
+                  border: 0,
+                  cursor: "pointer",
+                  background: colorForPin(r.employee_id),
+                  color: "#fff",
+                  fontWeight: 600,
+                  fontSize: 13,
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  boxShadow: "0 2px 8px rgba(3,7,18,0.28)",
+                }}
+              >
+                {initials(r.employee_name)}
+                <span
+                  style={{
+                    position: "absolute",
+                    right: -2,
+                    bottom: -2,
+                    width: 12,
+                    height: 12,
+                    borderRadius: "50%",
+                    background: s.dot,
+                    border: "2px solid var(--card)",
+                  }}
+                />
+              </button>
+            );
+          })
+        )}
+      </Card>
+
+      <Card style={{ padding: 14, display: "flex", flexDirection: "column", gap: 4 }}>
+        <DrawerSectionLabel>In the field · {pinned.length}</DrawerSectionLabel>
+        {pinned.length === 0 ? (
+          <div style={{ fontSize: 13, color: "var(--adaptive-500)" }}>No one checked in with a location.</div>
+        ) : (
+          pinned.map((r) => (
+            <button
+              key={r.shift.id}
+              onClick={() => onSelect(r)}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "8px 6px",
+                border: 0,
+                borderBottom: "1px solid var(--adaptive-100)",
+                background: "transparent",
+                cursor: "pointer",
+                fontFamily: "inherit",
+                textAlign: "left",
+              }}
+            >
+              <Avatar person={{ id: r.employee_id, name: r.employee_name }} size={30} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: "var(--adaptive-900)" }}>{r.employee_name}</div>
+                <div style={{ fontSize: 11.5, color: "var(--adaptive-500)" }}>{locationName(r.shift.location_id)}</div>
+              </div>
+              <StatusChip status={r._status} small />
+            </button>
+          ))
+        )}
+      </Card>
+    </div>
+  );
+}
+
+// Distinct pin color per employee (reuses the avatar hue logic indirectly).
+function colorForPin(id: string): string {
+  const palette = ["#ea580c", "#2563eb", "#7c3aed", "#0d9488", "#db2777", "#d97706", "#15803d", "#4b5563"];
+  let total = 0;
+  for (const c of id) total += c.charCodeAt(0);
+  return palette[total % palette.length];
+}
+
 function ActivityRow({ time, label, dot }: { time: string; label: string; dot: string }) {
   return (
     <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
@@ -502,11 +684,13 @@ function DetailDrawer({
 
 export function LiveView({
   entries,
+  leaveRequests,
   locationNames,
   onRefresh,
   loading,
 }: {
   entries: LiveViewEntry[];
+  leaveRequests: LeaveRequest[];
   locationNames: Map<string, string>;
   onRefresh: () => void;
   loading: boolean;
@@ -515,11 +699,23 @@ export function LiveView({
   const [filter, setFilter] = useState<LiveStatus | null>(null);
   const [sel, setSel] = useState<Row | null>(null);
   const nowMs = Date.now();
+  const today = new Date();
 
   const rows: Row[] = entries.map((e) => ({ ...e, _status: deriveStatus(e, nowMs) }));
   const count = (st: LiveStatus) => rows.filter((r) => r._status === st).length;
   const shown = filter ? rows.filter((r) => r._status === filter) : rows;
   const locationName = (id?: string | null) => (id ? locationNames.get(id) ?? "Unknown" : "Unassigned");
+
+  // On leave today: distinct employees with an approved request covering today.
+  const onLeaveCount = (() => {
+    const ids = new Set<string>();
+    for (const l of leaveRequests) {
+      if (l.status === "approved" && leaveCoversDay(l.start_date, l.end_date, today)) {
+        ids.add(l.employee_id);
+      }
+    }
+    return ids.size;
+  })();
 
   return (
     <div style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
@@ -569,9 +765,11 @@ export function LiveView({
 
       <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
         <KpiCard label="On shift" dot="var(--green-500)" value={count("working")} active={filter === "working"} onClick={() => setFilter(filter === "working" ? null : "working")} />
+        <KpiCard label="On break" dot="var(--amber-500)" value={count("break")} active={filter === "break"} onClick={() => setFilter(filter === "break" ? null : "break")} />
         <KpiCard label="Not checked in" dot="var(--red-500)" value={count("late")} active={filter === "late"} onClick={() => setFilter(filter === "late" ? null : "late")} />
         <KpiCard label="Upcoming" dot="var(--adaptive-400)" value={count("upcoming")} active={filter === "upcoming"} onClick={() => setFilter(filter === "upcoming" ? null : "upcoming")} />
         <KpiCard label="Checked out" dot="var(--blue-500)" value={count("done")} active={filter === "done"} onClick={() => setFilter(filter === "done" ? null : "done")} />
+        <LeaveKpi value={onLeaveCount} />
       </div>
 
       {filter && (
@@ -611,6 +809,8 @@ export function LiveView({
         </Card>
       ) : layout === "board" ? (
         <Board rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+      ) : layout === "map" ? (
+        <MapView rows={shown} locationName={locationName} onSelect={setSel} />
       ) : (
         <ListView rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
       )}

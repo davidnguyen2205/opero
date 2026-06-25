@@ -4,8 +4,10 @@ import type {
   CreateShiftRequest,
   Department,
   Employee,
+  LeaveRequest,
   Location,
   Shift,
+  Tour,
   UpdateShiftRequest,
 } from "../api/resources";
 import {
@@ -18,6 +20,7 @@ import {
   colorForId,
   formatTime,
   humanize,
+  leaveCoversDay,
 } from "../ui";
 
 // ── Local date helpers (week grid) ────────────────────────────────────────
@@ -208,6 +211,7 @@ function ShiftDrawer({
   shift,
   employees,
   locations,
+  tours,
   defaultEmployeeId,
   defaultDay,
   onClose,
@@ -217,6 +221,7 @@ function ShiftDrawer({
   shift?: Shift;
   employees: Employee[];
   locations: Location[];
+  tours: Tour[];
   defaultEmployeeId: string;
   defaultDay: Date | null;
   onClose: () => void;
@@ -233,6 +238,7 @@ function ShiftDrawer({
     shift?.employee_id ?? defaultEmployeeId ?? employees[0]?.id ?? "",
   );
   const [locationId, setLocationId] = useState(shift?.location_id ?? "");
+  const [tourId, setTourId] = useState(shift?.tour_id ?? "");
   const [startsAt, setStartsAt] = useState(
     shift ? toLocalInput(new Date(shift.starts_at)) : toLocalInput(base),
   );
@@ -249,6 +255,7 @@ function ShiftDrawer({
       const body = {
         employee_id: employeeId,
         location_id: locationId || undefined,
+        tour_id: tourId || undefined,
         starts_at: new Date(startsAt).toISOString(),
         ends_at: new Date(endsAt).toISOString(),
         notes: notes.trim() || undefined,
@@ -292,6 +299,19 @@ function ShiftDrawer({
             ))}
           </select>
         </div>
+        {tours.length > 0 && (
+          <div>
+            <label style={LBL}>Tour</label>
+            <select value={tourId} onChange={(e) => setTourId(e.target.value)} style={FIELD}>
+              <option value="">No tour</option>
+              {tours.map((t) => (
+                <option key={t.id} value={t.id}>
+                  {t.name}
+                </option>
+              ))}
+            </select>
+          </div>
+        )}
         <div>
           <label style={LBL}>Location / assignment</label>
           <select value={locationId} onChange={(e) => setLocationId(e.target.value)} style={FIELD}>
@@ -363,6 +383,8 @@ export function Roster({
   locations,
   departments,
   shifts,
+  tours,
+  leaveRequests,
   locationNames,
   onCreate,
   onUpdate,
@@ -374,6 +396,8 @@ export function Roster({
   locations: Location[];
   departments: Department[];
   shifts: Shift[];
+  tours: Tour[];
+  leaveRequests: LeaveRequest[];
   locationNames: Map<string, string>;
   onCreate: (body: CreateShiftRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateShiftRequest) => Promise<void>;
@@ -396,11 +420,22 @@ export function Roster({
   const activeEmployees = employees.filter((e) => e.status === "active");
   const roster = activeEmployees.length ? activeEmployees : employees;
 
+  const tourById = useMemo(() => new Map(tours.map((t) => [t.id, t])), [tours]);
+  const approvedLeave = useMemo(
+    () => leaveRequests.filter((l) => l.status === "approved"),
+    [leaveRequests],
+  );
+  // Tours that actually appear in the displayed week's shifts (for the legend).
+  const weekTourIds = new Set<string>();
+
   // Shifts within the displayed week only.
   const weekShifts = shifts.filter((s) => {
     const t = new Date(s.starts_at);
     return t >= days[0] && t < new Date(days[6].getTime() + 86_400_000);
   });
+  for (const s of weekShifts) {
+    if (s.tour_id) weekTourIds.add(s.tour_id);
+  }
   const draftIds = weekShifts.filter((s) => s.status === "draft").map((s) => s.id);
 
   // Group rows by department when departments exist; otherwise one flat group.
@@ -437,8 +472,20 @@ export function Roster({
     year: "numeric",
   }).format(days[6])}`;
 
+  // Shift chips are colored & labelled by their tour; fall back to location.
+  function shiftTour(s: Shift): Tour | undefined {
+    return s.tour_id ? tourById.get(s.tour_id) : undefined;
+  }
   function shiftLabel(s: Shift): string {
+    const tour = shiftTour(s);
+    if (tour) return tour.name;
     return s.location_id ? locationNames.get(s.location_id) ?? "Assigned shift" : "Assigned shift";
+  }
+  function shiftColor(s: Shift): string {
+    const tour = shiftTour(s);
+    if (tour?.color) return tour.color;
+    if (tour) return colorForId(tour.id);
+    return colorForId(s.location_id ?? s.id);
   }
 
   return (
@@ -637,6 +684,13 @@ export function Roster({
                         {days.map((d, di) => {
                           const isToday = sameDay(d, today);
                           const dayShifts = empShifts.filter((s) => sameDay(new Date(s.starts_at), d));
+                          const onLeave =
+                            dayShifts.length === 0 &&
+                            approvedLeave.some(
+                              (l) =>
+                                l.employee_id === emp.id &&
+                                leaveCoversDay(l.start_date, l.end_date, d),
+                            );
                           return (
                             <div
                               key={di}
@@ -655,12 +709,34 @@ export function Roster({
                                     key={s.id}
                                     shift={s}
                                     label={shiftLabel(s)}
-                                    color={colorForId(s.location_id ?? s.id)}
+                                    color={shiftColor(s)}
                                     onPublish={onPublish}
                                     onEdit={setEditingShift}
                                     onDelete={onDelete}
                                   />
                                 ))
+                              ) : onLeave ? (
+                                <div
+                                  title="Approved time off"
+                                  style={{
+                                    flex: 1,
+                                    minHeight: 44,
+                                    borderRadius: 6,
+                                    border: "1px solid var(--adaptive-200)",
+                                    backgroundImage:
+                                      "repeating-linear-gradient(45deg, var(--adaptive-100), var(--adaptive-100) 6px, transparent 6px, transparent 12px)",
+                                    display: "flex",
+                                    alignItems: "center",
+                                    justifyContent: "center",
+                                    gap: 5,
+                                    fontSize: 11,
+                                    fontWeight: 600,
+                                    color: "var(--adaptive-500)",
+                                  }}
+                                >
+                                  <Icon name="sun" size={13} color="var(--adaptive-400)" />
+                                  Leave
+                                </div>
                               ) : (
                                 <button
                                   onClick={() => setAdding({ employeeId: emp.id, day: d })}
@@ -696,7 +772,7 @@ export function Roster({
         </Card>
       )}
 
-      {locations.length > 0 && (
+      {weekTourIds.size > 0 && (
         <div
           style={{
             display: "flex",
@@ -707,13 +783,17 @@ export function Roster({
             color: "var(--adaptive-500)",
           }}
         >
-          <span style={{ fontWeight: 600 }}>Locations:</span>
-          {locations.slice(0, 8).map((loc) => (
-            <span key={loc.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
-              <span style={{ width: 9, height: 9, borderRadius: 3, background: colorForId(loc.id) }} />
-              {loc.name}
-            </span>
-          ))}
+          <span style={{ fontWeight: 600 }}>Tours:</span>
+          {tours
+            .filter((t) => weekTourIds.has(t.id))
+            .map((t) => (
+              <span key={t.id} style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+                <span
+                  style={{ width: 9, height: 9, borderRadius: 3, background: t.color ?? colorForId(t.id) }}
+                />
+                {t.name}
+              </span>
+            ))}
         </div>
       )}
 
@@ -722,6 +802,7 @@ export function Roster({
           shift={editingShift ?? undefined}
           employees={roster}
           locations={locations}
+          tours={tours}
           defaultEmployeeId={adding?.employeeId ?? ""}
           defaultDay={adding?.day ?? null}
           onClose={() => {

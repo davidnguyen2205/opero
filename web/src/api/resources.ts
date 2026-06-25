@@ -7,6 +7,7 @@ export type Department = components["schemas"]["Department"];
 export type Employee = components["schemas"]["Employee"];
 export type Location = components["schemas"]["Location"];
 export type Role = components["schemas"]["Role"];
+export type AccessLevel = components["schemas"]["AccessLevel"];
 export type Shift = components["schemas"]["Shift"];
 export type LiveViewEntry = components["schemas"]["LiveViewEntry"];
 export type LeaveRequest = components["schemas"]["LeaveRequest"];

@@ -824,6 +824,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/media": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload a media file (e.g. a check-in photo).
+         * @description Uploads a file to object storage and returns a URL to reference it (e.g. as a check-in/out photo_url). The file is stored under the caller's tenant. Multipart form field name is "file".
+         */
+        post: operations["uploadMedia"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -1507,6 +1527,10 @@ export interface components {
             active?: boolean;
             color?: string | null;
             description?: string | null;
+        };
+        MediaUploadResponse: {
+            /** @description A URL that can be used to reference the uploaded file (e.g. as photo_url). */
+            url: string;
         };
     };
     responses: {
@@ -3059,6 +3083,35 @@ export interface operations {
                     "application/json": components["schemas"]["MyStats"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+        };
+    };
+    uploadMedia: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description Uploaded. */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MediaUploadResponse"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
         };
     };

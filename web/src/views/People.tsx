@@ -41,6 +41,7 @@ const TYPE_TONE: Record<Employee["employment_type"], ChipTone> = {
 
 function MemberDrawer({
   employee,
+  employees,
   departments,
   roles,
   onClose,
@@ -48,6 +49,7 @@ function MemberDrawer({
   onUpdate,
 }: {
   employee?: Employee;
+  employees: Employee[];
   departments: Department[];
   roles: Role[];
   onClose: () => void;
@@ -66,9 +68,17 @@ function MemberDrawer({
   const [email, setEmail] = useState(employee?.email ?? "");
   const [phone, setPhone] = useState(employee?.phone ?? "");
   const [hiredAt, setHiredAt] = useState(employee?.hired_at ?? "");
+  const [location, setLocation] = useState(employee?.location ?? "");
+  const [languages, setLanguages] = useState((employee?.languages ?? []).join(", "));
+  const [emergencyName, setEmergencyName] = useState(employee?.emergency_contact_name ?? "");
+  const [emergencyPhone, setEmergencyPhone] = useState(employee?.emergency_contact_phone ?? "");
+  const [reportsTo, setReportsTo] = useState(employee?.reports_to ?? "");
+  const [employeeCode, setEmployeeCode] = useState(employee?.employee_code ?? "");
   const [submitting, setSubmitting] = useState(false);
 
   const canSubmit = fullName.trim().length > 0 && !submitting;
+  // A person can't report to themselves.
+  const reportsToOptions = employees.filter((e) => e.id !== employee?.id);
 
   async function submit() {
     if (!canSubmit) return;
@@ -76,6 +86,10 @@ function MemberDrawer({
     try {
       // PATCH in v1 can't clear fields back to null, so empties are omitted
       // rather than sent — same body shape for create and update.
+      const langs = languages
+        .split(",")
+        .map((l) => l.trim())
+        .filter(Boolean);
       const body = {
         full_name: fullName.trim(),
         department_id: departmentId || undefined,
@@ -86,6 +100,12 @@ function MemberDrawer({
         email: email.trim() || undefined,
         phone: phone.trim() || undefined,
         hired_at: hiredAt || undefined,
+        location: location.trim() || undefined,
+        languages: langs.length ? langs : undefined,
+        emergency_contact_name: emergencyName.trim() || undefined,
+        emergency_contact_phone: emergencyPhone.trim() || undefined,
+        reports_to: reportsTo || undefined,
+        employee_code: employeeCode.trim() || undefined,
       };
       if (employee) {
         await onUpdate(employee.id, body);
@@ -184,9 +204,46 @@ function MemberDrawer({
             </Field>
           </div>
         </div>
-        <Field label="Hired at">
-          <input type="date" value={hiredAt} onChange={(e) => setHiredAt(e.target.value)} style={controlStyle} />
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Hired at">
+              <input type="date" value={hiredAt} onChange={(e) => setHiredAt(e.target.value)} style={controlStyle} />
+            </Field>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Field label="Employee ID">
+              <input value={employeeCode} onChange={(e) => setEmployeeCode(e.target.value)} placeholder="e.g. TT-1007" style={controlStyle} />
+            </Field>
+          </div>
+        </div>
+        <Field label="Location">
+          <input value={location} onChange={(e) => setLocation(e.target.value)} placeholder="e.g. Lisbon" style={controlStyle} />
         </Field>
+        <Field label="Languages (comma-separated)">
+          <input value={languages} onChange={(e) => setLanguages(e.target.value)} placeholder="English, Portuguese" style={controlStyle} />
+        </Field>
+        <Field label="Reports to">
+          <select value={reportsTo} onChange={(e) => setReportsTo(e.target.value)} style={controlStyle}>
+            <option value="">None</option>
+            {reportsToOptions.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.full_name}
+              </option>
+            ))}
+          </select>
+        </Field>
+        <div style={{ display: "flex", gap: 12 }}>
+          <div style={{ flex: 1 }}>
+            <Field label="Emergency contact">
+              <input value={emergencyName} onChange={(e) => setEmergencyName(e.target.value)} placeholder="Name" style={controlStyle} />
+            </Field>
+          </div>
+          <div style={{ flex: 1 }}>
+            <Field label="Emergency phone">
+              <input value={emergencyPhone} onChange={(e) => setEmergencyPhone(e.target.value)} style={controlStyle} />
+            </Field>
+          </div>
+        </div>
       </div>
     </Drawer>
   );
@@ -492,6 +549,7 @@ export function People({
       {(adding || editing) && (
         <MemberDrawer
           employee={editing ?? undefined}
+          employees={employees}
           departments={departments}
           roles={roles}
           onClose={() => {

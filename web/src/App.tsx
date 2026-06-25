@@ -629,7 +629,13 @@ export function App() {
         />
         <div style={{ flex: 1, overflow: "auto", background: "var(--background)" }}>
           {view === "live" && (
-            <LiveView entries={live} locationNames={locationNames} onRefresh={() => void loadData()} loading={loading} />
+            <LiveView
+              entries={live}
+              leaveRequests={leaveRequests}
+              locationNames={locationNames}
+              onRefresh={() => void loadData()}
+              loading={loading}
+            />
           )}
           {view === "roster" && (
             <Roster
@@ -637,6 +643,8 @@ export function App() {
               locations={locations}
               departments={departments}
               shifts={shifts}
+              tours={tours}
+              leaveRequests={leaveRequests}
               locationNames={locationNames}
               onCreate={(body) => runMutation(async () => void (await shiftsApi.create(body)), "Draft shift added.")}
               onUpdate={(id, body) => runMutation(async () => void (await shiftsApi.update(id, body)), "Shift updated.")}
@@ -654,6 +662,9 @@ export function App() {
           {view === "tours" && (
             <Tours
               tours={tours}
+              employees={employees}
+              shifts={shifts}
+              live={live}
               onCreate={(body) => runMutation(async () => void (await toursApi.create(body)), "Tour created.")}
               onUpdate={(id, body) => runMutation(async () => void (await toursApi.update(id, body)), "Tour updated.")}
               onDelete={(id) => void runMutation(async () => await toursApi.delete(id), "Tour deleted.")}
@@ -678,6 +689,16 @@ export function App() {
                   selectedEmployee.department_id ? departmentNames.get(selectedEmployee.department_id) ?? null : null
                 }
                 roleName={selectedEmployee.role_id ? roleNames.get(selectedEmployee.role_id) ?? null : null}
+                roleAccessLevel={
+                  selectedEmployee.role_id
+                    ? roles.find((r) => r.id === selectedEmployee.role_id)?.access_level ?? null
+                    : null
+                }
+                reportsToName={
+                  selectedEmployee.reports_to
+                    ? employees.find((e) => e.id === selectedEmployee.reports_to)?.full_name ?? null
+                    : null
+                }
                 onNavigate={(v) => {
                   setSelectedEmployee(null);
                   setView(v);
@@ -709,6 +730,7 @@ export function App() {
             <Roles
               roles={roles}
               employees={employees}
+              departments={departments}
               onCreate={(body) => runMutation(async () => void (await rolesApi.create(body)), "Role created.")}
               onUpdate={(id, body) => runMutation(async () => void (await rolesApi.update(id, body)), "Role updated.")}
               onDelete={(id) => void runMutation(async () => await rolesApi.delete(id), "Role deleted.")}
