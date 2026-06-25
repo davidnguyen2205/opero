@@ -1,4 +1,6 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:typed_data';
 
 import 'package:http/http.dart' as http;
 
@@ -124,5 +126,84 @@ class ApiClient {
     );
     if (r.statusCode != 200) _raise(r);
     return AttendanceRecord.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /attendance/break — toggle the break state of the open attendance
+  /// identified by [clientId] (the same id used at check-in). on_break=true
+  /// moves checked_in → on_break; false resumes. Idempotent.
+  Future<AttendanceRecord> setBreak({
+    required String clientId,
+    required bool onBreak,
+  }) async {
+    final r = await _http.post(
+      Uri.parse('$apiBaseUrl/attendance/break'),
+      headers: _headers(jsonBody: true),
+      body: jsonEncode({'client_id': clientId, 'on_break': onBreak}),
+    );
+    if (r.statusCode != 200) _raise(r);
+    return AttendanceRecord.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /me/stats — the caller's personal activity aggregate.
+  Future<MyStats> myStats() async {
+    final r = await _http.get(Uri.parse('$apiBaseUrl/me/stats'), headers: _headers());
+    if (r.statusCode != 200) _raise(r);
+    return MyStats.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// GET /me/leave — the caller's own leave requests, newest first.
+  Future<List<LeaveRequest>> myLeave() async {
+    final r = await _http.get(Uri.parse('$apiBaseUrl/me/leave'), headers: _headers());
+    if (r.statusCode != 200) _raise(r);
+    final list = jsonDecode(r.body) as List<dynamic>;
+    return list.map((e) => LeaveRequest.fromJson(e as Map<String, dynamic>)).toList();
+  }
+
+  /// GET /me/leave/balance — the caller's leave balance for the current year.
+  Future<LeaveBalance> myLeaveBalance() async {
+    final r = await _http.get(Uri.parse('$apiBaseUrl/me/leave/balance'), headers: _headers());
+    if (r.statusCode != 200) _raise(r);
+    return LeaveBalance.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /me/leave — submit a time-off request. [type] is holiday|sick|personal;
+  /// dates are YYYY-MM-DD (end inclusive, on or after start).
+  Future<LeaveRequest> createLeave({
+    required String type,
+    required String startDate,
+    required String endDate,
+    String? note,
+  }) async {
+    final r = await _http.post(
+      Uri.parse('$apiBaseUrl/me/leave'),
+      headers: _headers(jsonBody: true),
+      body: jsonEncode({
+        'type': type,
+        'start_date': startDate,
+        'end_date': endDate,
+        if (note != null && note.isNotEmpty) 'note': note,
+      }),
+    );
+    if (r.statusCode != 201 && r.statusCode != 200) _raise(r);
+    return LeaveRequest.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
+  }
+
+  /// POST /media — multipart upload of a file under the multipart field "file".
+  /// Returns the stored URL to use as a check-in/out photo_url. Provide either a
+  /// [file] (native) or raw [bytes] (web), plus an optional [filename].
+  Future<MediaUpload> uploadMedia({File? file, Uint8List? bytes, String filename = 'photo.jpg'}) async {
+    final req = http.MultipartRequest('POST', Uri.parse('$apiBaseUrl/media'));
+    req.headers.addAll(_headers());
+    if (file != null) {
+      req.files.add(await http.MultipartFile.fromPath('file', file.path));
+    } else if (bytes != null) {
+      req.files.add(http.MultipartFile.fromBytes('file', bytes, filename: filename));
+    } else {
+      throw ArgumentError('uploadMedia requires either a file or bytes');
+    }
+    final streamed = await _http.send(req);
+    final r = await http.Response.fromStream(streamed);
+    if (r.statusCode != 201 && r.statusCode != 200) _raise(r);
+    return MediaUpload.fromJson(jsonDecode(r.body) as Map<String, dynamic>);
   }
 }

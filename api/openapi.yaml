@@ -1562,6 +1562,40 @@ paths:
         '401':
           $ref: '#/components/responses/Unauthorized'
 
+  /media:
+    post:
+      operationId: uploadMedia
+      tags: [attendance]
+      summary: Upload a media file (e.g. a check-in photo).
+      description: >
+        Uploads a file to object storage and returns a URL to reference it
+        (e.g. as a check-in/out photo_url). The file is stored under the
+        caller's tenant. Multipart form field name is "file".
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: Uploaded.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MediaUploadResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+
 components:
   securitySchemes:
     bearerAuth:
@@ -2862,3 +2896,11 @@ components:
         description:
           type: string
           nullable: true
+
+    MediaUploadResponse:
+      type: object
+      required: [url]
+      properties:
+        url:
+          type: string
+          description: A URL that can be used to reference the uploaded file (e.g. as photo_url).

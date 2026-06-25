@@ -9,6 +9,7 @@ import (
 	"github.com/davidnguyen2205/opero/backend/internal/identity"
 	"github.com/davidnguyen2205/opero/backend/internal/leave"
 	"github.com/davidnguyen2205/opero/backend/internal/liveview"
+	"github.com/davidnguyen2205/opero/backend/internal/media"
 	"github.com/davidnguyen2205/opero/backend/internal/roster"
 	"github.com/davidnguyen2205/opero/backend/internal/stats"
 	"github.com/davidnguyen2205/opero/backend/internal/tours"
@@ -27,6 +28,7 @@ type apiHandler struct {
 	lv2 *leave.Handler
 	st  *stats.Handler
 	tr  *tours.Handler
+	md  *media.Handler
 }
 
 var _ oapi.ServerInterface = (*apiHandler)(nil)
@@ -36,6 +38,39 @@ func (a *apiHandler) Signup(w http.ResponseWriter, r *http.Request) { a.cp.Signu
 func (a *apiHandler) Login(w http.ResponseWriter, r *http.Request)  { a.cp.Login(w, r) }
 func (a *apiHandler) GetCurrentUser(w http.ResponseWriter, r *http.Request) {
 	a.cp.GetCurrentUser(w, r)
+}
+func (a *apiHandler) PlatformLogin(w http.ResponseWriter, r *http.Request) {
+	a.cp.PlatformLogin(w, r)
+}
+func (a *apiHandler) GetCurrentPlatformUser(w http.ResponseWriter, r *http.Request) {
+	a.cp.GetCurrentPlatformUser(w, r)
+}
+func (a *apiHandler) PlatformListTenants(w http.ResponseWriter, r *http.Request) {
+	a.cp.PlatformListTenants(w, r)
+}
+func (a *apiHandler) PlatformGetTenant(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.cp.PlatformGetTenant(w, r, id)
+}
+func (a *apiHandler) PlatformUpdateTenant(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.cp.PlatformUpdateTenant(w, r, id)
+}
+func (a *apiHandler) PlatformListUsers(w http.ResponseWriter, r *http.Request, params oapi.PlatformListUsersParams) {
+	a.cp.PlatformListUsers(w, r, params)
+}
+func (a *apiHandler) PlatformUpdateUser(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.cp.PlatformUpdateUser(w, r, id)
+}
+func (a *apiHandler) PlatformListSubscriptions(w http.ResponseWriter, r *http.Request, params oapi.PlatformListSubscriptionsParams) {
+	a.cp.PlatformListSubscriptions(w, r, params)
+}
+func (a *apiHandler) PlatformUpdateSubscription(w http.ResponseWriter, r *http.Request, id oapi.IdParam) {
+	a.cp.PlatformUpdateSubscription(w, r, id)
+}
+func (a *apiHandler) PlatformGetSystemHealth(w http.ResponseWriter, r *http.Request) {
+	a.cp.PlatformGetSystemHealth(w, r)
+}
+func (a *apiHandler) PlatformListAuditEvents(w http.ResponseWriter, r *http.Request, params oapi.PlatformListAuditEventsParams) {
+	a.cp.PlatformListAuditEvents(w, r, params)
 }
 
 // identity — departments
@@ -134,6 +169,7 @@ func (a *apiHandler) ListAttendance(w http.ResponseWriter, r *http.Request, para
 }
 func (a *apiHandler) CheckIn(w http.ResponseWriter, r *http.Request)  { a.at.CheckIn(w, r) }
 func (a *apiHandler) CheckOut(w http.ResponseWriter, r *http.Request) { a.at.CheckOut(w, r) }
+func (a *apiHandler) SetBreak(w http.ResponseWriter, r *http.Request) { a.at.SetBreak(w, r) }
 
 // liveview
 func (a *apiHandler) GetLiveView(w http.ResponseWriter, r *http.Request, params oapi.GetLiveViewParams) {
@@ -160,6 +196,9 @@ func (a *apiHandler) RejectLeave(w http.ResponseWriter, r *http.Request, id oapi
 
 // stats
 func (a *apiHandler) GetMyStats(w http.ResponseWriter, r *http.Request) { a.st.GetMyStats(w, r) }
+
+// media
+func (a *apiHandler) UploadMedia(w http.ResponseWriter, r *http.Request) { a.md.UploadMedia(w, r) }
 
 // tours
 func (a *apiHandler) ListTours(w http.ResponseWriter, r *http.Request, params oapi.ListToursParams) {

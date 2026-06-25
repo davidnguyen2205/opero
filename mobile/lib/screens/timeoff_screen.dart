@@ -1,22 +1,28 @@
 import 'package:flutter/material.dart';
 
-import '../mock/field_mock.dart';
+import '../api/api_client.dart';
 import '../theme.dart';
 
-/// MOCK — no leave/time-off API in v1 (it's a v1.1 area). This form is a
-/// front-end demo: submitting does not persist or notify anyone. Clearly badged.
+/// REAL — submits a time-off request via `POST /me/leave`. The manager reviews
+/// it through the web app's /leave endpoints. Pops `true` on success so the
+/// caller can refresh the request list + balance.
 class TimeOffScreen extends StatefulWidget {
-  const TimeOffScreen({super.key});
+  final ApiClient api;
+  const TimeOffScreen({super.key, required this.api});
 
   @override
   State<TimeOffScreen> createState() => _TimeOffScreenState();
 }
 
 class _TimeOffScreenState extends State<TimeOffScreen> {
+  // UI label -> API enum (holiday|sick|personal).
+  static const _types = {'Holiday': 'holiday', 'Sick': 'sick', 'Personal': 'personal'};
   String _type = 'Holiday';
   DateTime? _from;
   DateTime? _to;
   final _note = TextEditingController();
+  bool _submitting = false;
+  String? _error;
 
   @override
   void dispose() {
@@ -37,6 +43,50 @@ class _TimeOffScreenState extends State<TimeOffScreen> {
 
   String _fmt(DateTime? d) => d == null ? 'Select' : '${d.day}/${d.month}/${d.year}';
 
+  String _apiDate(DateTime d) =>
+      '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+
+  Future<void> _submit() async {
+    final from = _from, to = _to;
+    if (from == null || to == null) {
+      setState(() => _error = 'Please choose a start and end date.');
+      return;
+    }
+    if (to.isBefore(from)) {
+      setState(() => _error = 'The end date must be on or after the start date.');
+      return;
+    }
+    setState(() {
+      _submitting = true;
+      _error = null;
+    });
+    try {
+      await widget.api.createLeave(
+        type: _types[_type]!,
+        startDate: _apiDate(from),
+        endDate: _apiDate(to),
+        note: _note.text.trim(),
+      );
+      if (!mounted) return;
+      Navigator.of(context).pop(true);
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Time-off request submitted.')),
+      );
+    } on ApiException catch (e) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = e.message;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() {
+        _submitting = false;
+        _error = 'Couldn\'t submit your request. Check your connection and try again.';
+      });
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -45,13 +95,7 @@ class _TimeOffScreenState extends State<TimeOffScreen> {
           icon: const Icon(Icons.chevron_left, color: AppColors.grey700),
           onPressed: () => Navigator.of(context).maybePop(),
         ),
-        title: const Row(
-          children: [
-            Text('Request Time Off', style: kCardTitle),
-            SizedBox(width: 8),
-            DemoBadge(),
-          ],
-        ),
+        title: const Text('Request Time Off', style: kCardTitle),
       ),
       body: SafeArea(
         child: Column(
@@ -86,49 +130,55 @@ class _TimeOffScreenState extends State<TimeOffScreen> {
                     decoration: _inputDecoration('Anything your manager should know…'),
                   ),
                   const SizedBox(height: 16),
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
-                    decoration: BoxDecoration(
-                      color: AppColors.grey50,
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(color: AppColors.grey200),
-                    ),
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Icon(Icons.group, size: 17, color: AppColors.grey400),
-                        const SizedBox(width: 10),
-                        Expanded(
-                          child: Text.rich(
-                            TextSpan(
-                              style: const TextStyle(fontSize: 12.5, color: AppColors.grey500, height: 1.5),
-                              children: [
-                                const TextSpan(text: 'In the full product this goes to '),
-                                TextSpan(
-                                    text: FieldMock.profile.managerName,
-                                    style: const TextStyle(fontWeight: FontWeight.w600, color: AppColors.grey700)),
-                                const TextSpan(text: ' for approval. (Demo — not submitted anywhere.)'),
-                              ],
+                  if (_error != null)
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.red50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.red200),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, size: 17, color: AppColors.red),
+                          const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(_error!, style: const TextStyle(fontSize: 12.5, color: AppColors.red)),
+                          ),
+                        ],
+                      ),
+                    )
+                  else
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+                      decoration: BoxDecoration(
+                        color: AppColors.grey50,
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: AppColors.grey200),
+                      ),
+                      child: const Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Icon(Icons.group, size: 17, color: AppColors.grey400),
+                          SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              'This goes to your manager for approval.',
+                              style: TextStyle(fontSize: 12.5, color: AppColors.grey500, height: 1.5),
                             ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
-                  ),
                 ],
               ),
             ),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
               child: PhoneButton(
-                label: 'Submit Request',
+                label: _submitting ? 'Submitting…' : 'Submit Request',
                 icon: Icons.send,
-                onPressed: () {
-                  Navigator.of(context).pop();
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Demo only — request was not submitted.')),
-                  );
-                },
+                onPressed: _submitting ? null : _submit,
               ),
             ),
           ],

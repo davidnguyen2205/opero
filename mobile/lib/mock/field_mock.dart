@@ -57,40 +57,6 @@ class MockNotification {
   });
 }
 
-class MockTimeOffRequest {
-  final String range;
-  final String days;
-  final String status; // Approved | Pending
-  const MockTimeOffRequest({required this.range, required this.days, required this.status});
-}
-
-class MockProfileStats {
-  final int onTimePct;
-  final int hoursThisWeek;
-  final int toursThisMonth;
-  final String tenure;
-  final int daysUsed;
-  final int daysTotal;
-  final List<String> languages;
-  final List<MockTimeOffRequest> requests;
-  final String phone;
-  final String employeeId;
-  final String managerName;
-  const MockProfileStats({
-    required this.onTimePct,
-    required this.hoursThisWeek,
-    required this.toursThisMonth,
-    required this.tenure,
-    required this.daysUsed,
-    required this.daysTotal,
-    required this.languages,
-    required this.requests,
-    required this.phone,
-    required this.employeeId,
-    required this.managerName,
-  });
-}
-
 /// All demo data lives behind this single accessor.
 class FieldMock {
   FieldMock._();
@@ -174,21 +140,4 @@ class FieldMock {
   ];
 
   static int get unreadNotifications => notifications.where((n) => n.unread).length;
-
-  static const MockProfileStats profile = MockProfileStats(
-    onTimePct: 96,
-    hoursThisWeek: 29,
-    toursThisMonth: 19,
-    tenure: '6 yrs',
-    daysUsed: 8,
-    daysTotal: 22,
-    languages: ['PT', 'EN', 'ES'],
-    requests: [
-      MockTimeOffRequest(range: '25 Jun', days: '1 day', status: 'Approved'),
-      MockTimeOffRequest(range: '14–18 Jul', days: '5 days', status: 'Pending'),
-    ],
-    phone: '+351 912 004 111',
-    employeeId: 'TT-1002',
-    managerName: 'Helena Bastos',
-  );
 }

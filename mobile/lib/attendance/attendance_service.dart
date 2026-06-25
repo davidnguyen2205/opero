@@ -97,6 +97,19 @@ class AttendanceService extends ChangeNotifier {
     unawaited(sync());
   }
 
+  /// Toggle the break state of the open attendance for [shiftId]. Unlike
+  /// check-in/out this is NOT queued offline — break is a real-time online
+  /// action against the active record's client_id, and the server is idempotent
+  /// on (client_id, on_break). Throws if there is no open attendance or the
+  /// call fails so the UI can surface it and keep its toggle truthful.
+  Future<void> setBreak({String? shiftId, required bool onBreak}) async {
+    final clientId = await activeClientId(shiftId);
+    if (clientId == null) {
+      throw StateError('no active check-in to set break for this shift');
+    }
+    await api.setBreak(clientId: clientId, onBreak: onBreak);
+  }
+
   Future<void> _refreshPending() async {
     _pendingCount = await queue.length();
     notifyListeners();

@@ -105,9 +105,8 @@ type UpdateDepartmentInput struct {
 	Color          *string
 }
 
-var validAccessLevels = map[string]bool{
-	"mobile": true, "web_manager": true, "web_admin": true,
-}
+// Access levels are validated by the DB CHECK constraint (mapped to a 400 in
+// the store), so no separate Go-side allowlist is needed here.
 
 type CreateEmployeeInput struct {
 	UserID                *uuid.UUID

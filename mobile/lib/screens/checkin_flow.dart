@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 
@@ -11,11 +12,12 @@ import 'shift_view.dart';
 /// locating → photo → confirm → active → done. Drives the REAL
 /// [AttendanceService] (offline-tolerant, single client_id per check-in;
 /// check-out reuses it). Geolocation is captured via [captureContext]; the photo
-/// is captured for proof-of-capability but NOT uploaded (no blob storage in v1,
-/// see SHIPPING.md §8).
+/// is captured and uploaded via `POST /media`, and the returned URL is sent as
+/// the check-in/out photo_url.
 ///
 /// The "within 25 m" copy is cosmetic — the server does no geofencing. "Break"
-/// has no API, so it is a local-only visual toggle clearly marked not persisted.
+/// is REAL: it toggles checked_in ⇄ on_break via `POST /attendance/break`
+/// against the active attendance's client_id.
 enum CheckInStep { locating, photo, confirm, active, done }
 
 class CheckInFlow extends StatefulWidget {
@@ -43,7 +45,10 @@ class _CheckInFlowState extends State<CheckInFlow> {
   Capture? _capture;
   bool _capturing = false;
   bool _photoCaptured = false;
+  bool _uploadingPhoto = false;
+  String? _photoUrl; // URL from POST /media, sent as photo_url
   bool _onBreak = false;
+  bool _breakBusy = false;
   DateTime? _checkedInAt;
   Timer? _ticker;
   Duration _elapsed = Duration.zero;
@@ -92,15 +97,32 @@ class _CheckInFlowState extends State<CheckInFlow> {
       _capturing = false;
       _step = CheckInStep.confirm;
     });
+    // Upload the captured photo to object storage (POST /media). Best-effort:
+    // if it fails (offline / storage hiccup) we still let the check-in proceed
+    // without a photo_url rather than block attendance.
+    final path = cap.photoPath;
+    if (path != null) {
+      setState(() => _uploadingPhoto = true);
+      try {
+        final media = await widget.attendance.api.uploadMedia(file: File(path));
+        if (mounted) setState(() => _photoUrl = media.url);
+      } catch (_) {
+        // leave _photoUrl null; check-in continues without it
+      } finally {
+        if (mounted) setState(() => _uploadingPhoto = false);
+      }
+    }
   }
 
   Future<void> _confirmCheckIn() async {
-    // Enqueue the REAL check-in (durable, offline-tolerant). photo_url is left
-    // unsent — v1 has no blob storage (SHIPPING.md §8).
+    // Enqueue the REAL check-in (durable, offline-tolerant). photo_url is the
+    // URL returned by POST /media for the captured photo (null if none/upload
+    // failed — attendance is never blocked on the photo).
     await widget.attendance.checkIn(
       shiftId: shift.id,
       lat: _capture?.lat,
       lng: _capture?.lng,
+      photoUrl: _photoUrl,
     );
     if (!mounted) return;
     setState(() {
@@ -109,6 +131,23 @@ class _CheckInFlowState extends State<CheckInFlow> {
       _step = CheckInStep.active;
     });
     _startTicker();
+  }
+
+  Future<void> _toggleBreak() async {
+    final next = !_onBreak;
+    setState(() => _breakBusy = true);
+    try {
+      await widget.attendance.setBreak(shiftId: shift.id, onBreak: next);
+      if (!mounted) return;
+      setState(() => _onBreak = next);
+    } catch (_) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Couldn\'t update break — check your connection.')),
+      );
+    } finally {
+      if (mounted) setState(() => _breakBusy = false);
+    }
   }
 
   Future<void> _checkOut() async {
@@ -283,8 +322,17 @@ class _CheckInFlowState extends State<CheckInFlow> {
                 children: [
                   _confirmRow(Icons.place, 'Location',
                       ok ? '${shift.title} ✓' : 'Not captured', divider: true),
-                  _confirmRow(Icons.photo_camera, 'Photo',
-                      _photoCaptured ? 'Attached' : 'Skipped', divider: true),
+                  _confirmRow(
+                      Icons.photo_camera,
+                      'Photo',
+                      !_photoCaptured
+                          ? 'Skipped'
+                          : _uploadingPhoto
+                              ? 'Uploading…'
+                              : _photoUrl != null
+                                  ? 'Attached'
+                                  : 'Captured',
+                      divider: true),
                   _confirmRow(Icons.schedule, 'Time', _nowHm(), divider: false),
                 ],
               ),
@@ -410,11 +458,12 @@ class _CheckInFlowState extends State<CheckInFlow> {
               children: [
                 Expanded(
                   child: PhoneButton(
-                    label: _onBreak ? 'Resume' : 'Break',
+                    label: _breakBusy ? '…' : (_onBreak ? 'Resume' : 'Break'),
                     icon: Icons.free_breakfast,
                     tone: PhoneButtonTone.ghost,
-                    // Local-only visual toggle — there is NO break API, nothing persists.
-                    onPressed: () => setState(() => _onBreak = !_onBreak),
+                    // REAL: toggles checked_in ⇄ on_break via POST /attendance/break
+                    // against the active attendance's client_id.
+                    onPressed: _breakBusy ? null : _toggleBreak,
                   ),
                 ),
                 const SizedBox(width: 10),
