@@ -15,6 +15,7 @@ type repo interface {
 	GetByClientID(ctx context.Context, clientID uuid.UUID) (Record, error)
 	CreateCheckIn(ctx context.Context, employeeID uuid.UUID, in CheckInInput) (Record, error)
 	CheckOut(ctx context.Context, in CheckOutInput) (Record, error)
+	SetStatus(ctx context.Context, clientID uuid.UUID, status string) (Record, error)
 	List(ctx context.Context, f AttendanceFilter) ([]Record, error)
 	ListByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) ([]Record, error)
 }
@@ -125,6 +126,40 @@ func (s *Service) CheckOut(ctx context.Context, userID uuid.UUID, in CheckOutInp
 		return rec, nil // idempotent
 	}
 	return st.CheckOut(ctx, in)
+}
+
+// SetBreak toggles the break state of the authenticated user's open attendance
+// record (checked_in ⇄ on_break). Idempotent on the target state.
+func (s *Service) SetBreak(ctx context.Context, userID, clientID uuid.UUID, onBreak bool) (Record, error) {
+	if clientID == uuid.Nil {
+		return Record{}, fmt.Errorf("%w: client_id is required", ErrValidation)
+	}
+	empID, err := s.resolveEmployee(ctx, userID)
+	if err != nil {
+		return Record{}, err
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return Record{}, err
+	}
+	rec, err := st.GetByClientID(ctx, clientID)
+	if err != nil {
+		return Record{}, err // ErrNotFound
+	}
+	if rec.EmployeeID != empID {
+		return Record{}, ErrNotFound
+	}
+	target := "checked_in"
+	if onBreak {
+		target = "on_break"
+	}
+	if rec.Status == target {
+		return rec, nil // idempotent
+	}
+	if rec.Status != "checked_in" && rec.Status != "on_break" {
+		return Record{}, fmt.Errorf("%w: shift is not open", ErrValidation)
+	}
+	return st.SetStatus(ctx, clientID, target)
 }
 
 func (s *Service) List(ctx context.Context, f AttendanceFilter) ([]Record, error) {

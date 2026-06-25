@@ -38,6 +38,8 @@ func (h *Handler) GetLiveView(w http.ResponseWriter, r *http.Request, params oap
 			AttendanceStatus: oapi.LiveViewEntryAttendanceStatus(e.AttendanceStatus),
 			CheckInAt:        e.CheckInAt,
 			CheckOutAt:       e.CheckOutAt,
+			CheckInLat:       e.CheckInLat,
+			CheckInLng:       e.CheckInLng,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)
@@ -62,6 +64,7 @@ func toShift(s roster.Shift) oapi.Shift {
 		Id:         s.ID,
 		EmployeeId: s.EmployeeID,
 		LocationId: s.LocationID,
+		TourId:     s.TourID,
 		StartsAt:   s.StartsAt,
 		EndsAt:     s.EndsAt,
 		Notes:      s.Notes,

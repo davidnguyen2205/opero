@@ -1061,7 +1061,7 @@ paths:
           required: false
           schema:
             type: string
-            enum: [checked_in, checked_out, missed]
+            enum: [checked_in, checked_out, missed, on_break]
         - name: from
           in: query
           required: false
@@ -1149,6 +1149,37 @@ paths:
       responses:
         '200':
           description: Checked out (or already checked out — idempotent).
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AttendanceRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+
+  /attendance/break:
+    post:
+      operationId: setBreak
+      tags: [attendance]
+      summary: Start or end a break (field staff).
+      description: >
+        Toggles the break state of an open attendance record (identified by the
+        same client_id used at check-in): on_break=true moves checked_in →
+        on_break, on_break=false moves on_break → checked_in. Idempotent.
+      security:
+        - bearerAuth: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetBreakRequest'
+      responses:
+        '200':
+          description: The updated attendance record.
           content:
             application/json:
               schema:
@@ -2495,7 +2526,7 @@ components:
           nullable: true
         status:
           type: string
-          enum: [checked_in, checked_out, missed]
+          enum: [checked_in, checked_out, missed, on_break]
         created_at:
           type: string
           format: date-time
@@ -2547,6 +2578,18 @@ components:
           type: string
           nullable: true
 
+    SetBreakRequest:
+      type: object
+      required: [client_id, on_break]
+      properties:
+        client_id:
+          type: string
+          format: uuid
+          description: The same client_id used at check-in.
+        on_break:
+          type: boolean
+          description: true to start a break, false to resume.
+
     LiveViewEntry:
       type: object
       required: [employee_id, employee_name, shift, attendance_status]
@@ -2562,8 +2605,8 @@ components:
           type: string
           description: >
             Derived state for this shift: not_checked_in (no attendance record
-            linked), checked_in, or checked_out.
-          enum: [not_checked_in, checked_in, checked_out]
+            linked), checked_in, on_break, or checked_out.
+          enum: [not_checked_in, checked_in, checked_out, on_break]
         check_in_at:
           type: string
           format: date-time
@@ -2571,6 +2614,14 @@ components:
         check_out_at:
           type: string
           format: date-time
+          nullable: true
+        check_in_lat:
+          type: number
+          format: double
+          nullable: true
+        check_in_lng:
+          type: number
+          format: double
           nullable: true
 
     LeaveType:

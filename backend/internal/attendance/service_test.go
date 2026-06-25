@@ -43,6 +43,15 @@ func (f *fakeRepo) CheckOut(_ context.Context, in CheckOutInput) (Record, error)
 	f.byClient[in.ClientID] = r
 	return r, nil
 }
+func (f *fakeRepo) SetStatus(_ context.Context, clientID uuid.UUID, status string) (Record, error) {
+	r, ok := f.byClient[clientID]
+	if !ok {
+		return Record{}, ErrNotFound
+	}
+	r.Status = status
+	f.byClient[clientID] = r
+	return r, nil
+}
 func (f *fakeRepo) List(context.Context, AttendanceFilter) ([]Record, error) {
 	out := make([]Record, 0, len(f.byClient))
 	for _, r := range f.byClient {
@@ -123,6 +132,31 @@ func TestCheckInClientIDReuseByAnotherEmployeeConflicts(t *testing.T) {
 
 	if _, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: cid}); !errors.Is(err, ErrConflict) {
 		t.Fatalf("err = %v, want ErrConflict", err)
+	}
+}
+
+func TestSetBreakTogglesStatus(t *testing.T) {
+	emp := uuid.New()
+	svc, _ := newSvc(fakeResolver{empID: emp, found: true})
+	ctx, user, cid := context.Background(), uuid.New(), uuid.New()
+	if _, _, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid}); err != nil {
+		t.Fatalf("check-in: %v", err)
+	}
+	r, err := svc.SetBreak(ctx, user, cid, true)
+	if err != nil || r.Status != "on_break" {
+		t.Fatalf("start break: status=%q err=%v", r.Status, err)
+	}
+	// idempotent on the same target
+	if r2, err := svc.SetBreak(ctx, user, cid, true); err != nil || r2.Status != "on_break" {
+		t.Fatalf("re-break: status=%q err=%v", r2.Status, err)
+	}
+	r3, err := svc.SetBreak(ctx, user, cid, false)
+	if err != nil || r3.Status != "checked_in" {
+		t.Fatalf("resume: status=%q err=%v", r3.Status, err)
+	}
+	// unknown client_id
+	if _, err := svc.SetBreak(ctx, user, uuid.New(), true); !errors.Is(err, ErrNotFound) {
+		t.Fatalf("unknown: err = %v, want ErrNotFound", err)
 	}
 }
 

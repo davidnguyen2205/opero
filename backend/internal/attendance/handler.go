@@ -88,6 +88,24 @@ func (h *Handler) CheckOut(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, toRecord(rec))
 }
 
+func (h *Handler) SetBreak(w http.ResponseWriter, r *http.Request) {
+	userID, ok := h.currentUserID(w, r)
+	if !ok {
+		return
+	}
+	var body oapi.SetBreakRequest
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+		writeError(w, http.StatusBadRequest, "invalid_request", "malformed JSON body")
+		return
+	}
+	rec, err := h.svc.SetBreak(r.Context(), userID, body.ClientId, body.OnBreak)
+	if err != nil {
+		h.writeServiceError(w, r, err)
+		return
+	}
+	writeJSON(w, http.StatusOK, toRecord(rec))
+}
+
 func (h *Handler) ListAttendance(w http.ResponseWriter, r *http.Request, params oapi.ListAttendanceParams) {
 	recs, err := h.svc.List(r.Context(), AttendanceFilter{
 		EmployeeID: params.EmployeeId,

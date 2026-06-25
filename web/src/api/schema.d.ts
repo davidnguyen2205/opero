@@ -594,6 +594,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/attendance/break": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start or end a break (field staff).
+         * @description Toggles the break state of an open attendance record (identified by the same client_id used at check-in): on_break=true moves checked_in → on_break, on_break=false moves on_break → checked_in. Idempotent.
+         */
+        post: operations["setBreak"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/me/shifts": {
         parameters: {
             query?: never;
@@ -1289,7 +1309,7 @@ export interface components {
             check_out_lng?: number | null;
             check_out_photo_url?: string | null;
             /** @enum {string} */
-            status: "checked_in" | "checked_out" | "missed";
+            status: "checked_in" | "checked_out" | "missed" | "on_break";
             /** Format: date-time */
             created_at: string;
             /** Format: date-time */
@@ -1321,20 +1341,33 @@ export interface components {
             lng?: number | null;
             photo_url?: string | null;
         };
+        SetBreakRequest: {
+            /**
+             * Format: uuid
+             * @description The same client_id used at check-in.
+             */
+            client_id: string;
+            /** @description true to start a break, false to resume. */
+            on_break: boolean;
+        };
         LiveViewEntry: {
             /** Format: uuid */
             employee_id: string;
             employee_name: string;
             shift: components["schemas"]["Shift"];
             /**
-             * @description Derived state for this shift: not_checked_in (no attendance record linked), checked_in, or checked_out.
+             * @description Derived state for this shift: not_checked_in (no attendance record linked), checked_in, on_break, or checked_out.
              * @enum {string}
              */
-            attendance_status: "not_checked_in" | "checked_in" | "checked_out";
+            attendance_status: "not_checked_in" | "checked_in" | "checked_out" | "on_break";
             /** Format: date-time */
             check_in_at?: string | null;
             /** Format: date-time */
             check_out_at?: string | null;
+            /** Format: double */
+            check_in_lat?: number | null;
+            /** Format: double */
+            check_in_lng?: number | null;
         };
         /**
          * @description Kind of leave being requested.
@@ -2566,7 +2599,7 @@ export interface operations {
         parameters: {
             query?: {
                 employee_id?: string;
-                status?: "checked_in" | "checked_out" | "missed";
+                status?: "checked_in" | "checked_out" | "missed" | "on_break";
                 /** @description Inclusive lower bound on check_in_at (ISO-8601). */
                 from?: string;
                 /** @description Exclusive upper bound on check_in_at (ISO-8601). */
@@ -2648,6 +2681,33 @@ export interface operations {
         };
         responses: {
             /** @description Checked out (or already checked out — idempotent). */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AttendanceRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+        };
+    };
+    setBreak: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetBreakRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated attendance record. */
             200: {
                 headers: {
                     [name: string]: unknown;

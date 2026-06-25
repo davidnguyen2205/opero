@@ -261,3 +261,42 @@ func (q *Queries) ListAttendanceByShiftIDs(ctx context.Context, dollar_1 []uuid.
 	}
 	return items, nil
 }
+
+const setAttendanceStatus = `-- name: SetAttendanceStatus :one
+UPDATE attendance_records SET
+    status     = $1,
+    updated_at = now()
+WHERE client_id = $2
+  AND status IN ('checked_in', 'on_break')
+RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at
+`
+
+type SetAttendanceStatusParams struct {
+	Status   string
+	ClientID uuid.UUID
+}
+
+// Toggle break state for an open record. Only moves between checked_in and
+// on_break (a checked-out/missed record is left unchanged).
+func (q *Queries) SetAttendanceStatus(ctx context.Context, arg SetAttendanceStatusParams) (AttendanceRecord, error) {
+	row := q.db.QueryRow(ctx, setAttendanceStatus, arg.Status, arg.ClientID)
+	var i AttendanceRecord
+	err := row.Scan(
+		&i.ID,
+		&i.EmployeeID,
+		&i.ShiftID,
+		&i.ClientID,
+		&i.CheckInAt,
+		&i.CheckInLat,
+		&i.CheckInLng,
+		&i.CheckInPhotoUrl,
+		&i.CheckOutAt,
+		&i.CheckOutLat,
+		&i.CheckOutLng,
+		&i.CheckOutPhotoUrl,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+	)
+	return i, err
+}
