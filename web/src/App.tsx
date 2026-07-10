@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import type { ReactNode } from "react";
 import {
+  ApiError,
   authApi,
   departmentsApi,
   employeesApi,
@@ -70,6 +71,20 @@ const TITLES: Record<View, string> = {
 };
 
 const PEOPLE_VIEWS: View[] = ["people", "departments", "roles", "timeoff"];
+
+// Turn a thrown API error into a message for the error banner. A 403
+// ("forbidden") means the session is valid but the current role can't perform
+// the action — surface a clear, non-destructive notice and never sign the user
+// out. Any other error keeps its server/fallback message.
+function describeError(err: unknown, fallback: string): string {
+  if (err instanceof ApiError && err.isForbidden) {
+    return "You don't have permission to do that. This action requires an admin.";
+  }
+  if (err instanceof Error) {
+    return err.message;
+  }
+  return fallback;
+}
 
 function OperoMark({ size = 28 }: { size?: number }) {
   return (
@@ -546,7 +561,7 @@ export function App() {
       setTours(tourList);
       setLeaveRequests(leaveList);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Unable to load data.");
+      setError(describeError(err, "Unable to load data."));
     } finally {
       setLoading(false);
     }
@@ -592,7 +607,7 @@ export function App() {
         await loadData();
         setNotice(successMessage);
       } catch (err) {
-        setError(err instanceof Error ? err.message : "Request failed.");
+        setError(describeError(err, "Request failed."));
       }
     },
     [loadData],
@@ -605,6 +620,10 @@ export function App() {
   const tenantName = currentUser?.tenant.name ?? auth.tenant.name;
   const userEmail = currentUser?.user.email ?? auth.user.email;
   const userRole = currentUser?.user.role ?? auth.user.role;
+  // Coarse RBAC (mirrors the backend): admin-only surfaces are hidden from
+  // managers/employees so they never see buttons that would only 403. The
+  // server still enforces this; the UI just avoids dead controls.
+  const isAdmin = userRole === "admin";
 
   return (
     <div style={{ display: "flex", height: "100vh", overflow: "hidden", background: "var(--background)" }}>
@@ -711,6 +730,7 @@ export function App() {
                 roles={roles}
                 departmentNames={departmentNames}
                 roleNames={roleNames}
+                canDelete={isAdmin}
                 onOpen={setSelectedEmployee}
                 onCreate={(body) => runMutation(async () => void (await employeesApi.create(body)), "Employee added.")}
                 onUpdate={(id, body) => runMutation(async () => void (await employeesApi.update(id, body)), "Employee updated.")}
@@ -721,6 +741,7 @@ export function App() {
             <Departments
               departments={departments}
               employees={employees}
+              canManage={isAdmin}
               onCreate={(body) => runMutation(async () => void (await departmentsApi.create(body)), "Department created.")}
               onUpdate={(id, body) => runMutation(async () => void (await departmentsApi.update(id, body)), "Department updated.")}
               onDelete={(id) => void runMutation(async () => await departmentsApi.delete(id), "Department deleted.")}
@@ -731,6 +752,7 @@ export function App() {
               roles={roles}
               employees={employees}
               departments={departments}
+              canManage={isAdmin}
               onCreate={(body) => runMutation(async () => void (await rolesApi.create(body)), "Role created.")}
               onUpdate={(id, body) => runMutation(async () => void (await rolesApi.update(id, body)), "Role updated.")}
               onDelete={(id) => void runMutation(async () => await rolesApi.delete(id), "Role deleted.")}

@@ -39,6 +39,31 @@ type ApiResult<T> = {
   response: Response;
 };
 
+// Error thrown for any non-OK API response. It carries the HTTP `status` and
+// the machine-readable `code` from the JSON error body (e.g. "forbidden" on a
+// 403) so callers can react to the *kind* of failure — not just the message.
+// A 403 (insufficient role) is a valid session that lacks permission and must
+// be handled distinctly from a 401 (invalid/expired session).
+export class ApiError extends Error {
+  readonly status: number;
+  readonly code?: string;
+
+  constructor(message: string, status: number, code?: string) {
+    super(message);
+    this.name = "ApiError";
+    this.status = status;
+    this.code = code;
+  }
+
+  get isForbidden(): boolean {
+    return this.status === 403;
+  }
+
+  get isUnauthorized(): boolean {
+    return this.status === 401;
+  }
+}
+
 function errorMessage(error: unknown, fallback: string): string {
   if (typeof error === "object" && error && "message" in error) {
     const message = (error as { message?: unknown }).message;
@@ -49,12 +74,30 @@ function errorMessage(error: unknown, fallback: string): string {
   return fallback;
 }
 
+function errorCode(error: unknown): string | undefined {
+  if (typeof error === "object" && error && "code" in error) {
+    const code = (error as { code?: unknown }).code;
+    if (typeof code === "string" && code.trim()) {
+      return code;
+    }
+  }
+  return undefined;
+}
+
+function toApiError(result: ApiResult<unknown>, fallback: string): ApiError {
+  return new ApiError(
+    errorMessage(result.error, fallback),
+    result.response.status,
+    errorCode(result.error),
+  );
+}
+
 async function unwrap<T>(result: ApiResult<T>, fallback: string): Promise<T> {
   if (result.error || !result.response.ok) {
-    throw new Error(errorMessage(result.error, fallback));
+    throw toApiError(result, fallback);
   }
   if (result.data === undefined) {
-    throw new Error(fallback);
+    throw new ApiError(fallback, result.response.status);
   }
   return result.data;
 }
@@ -64,7 +107,7 @@ async function unwrapEmpty(
   fallback: string,
 ): Promise<void> {
   if (result.error || !result.response.ok) {
-    throw new Error(errorMessage(result.error, fallback));
+    throw toApiError(result, fallback);
   }
 }
 

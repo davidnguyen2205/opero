@@ -255,6 +255,7 @@ export function People({
   roles,
   departmentNames,
   roleNames,
+  canDelete,
   onOpen,
   onCreate,
   onUpdate,
@@ -265,6 +266,7 @@ export function People({
   roles: Role[];
   departmentNames: Map<string, string>;
   roleNames: Map<string, string>;
+  canDelete: boolean;
   onOpen: (employee: Employee) => void;
   onCreate: (body: CreateEmployeeRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateEmployeeRequest) => Promise<void>;
@@ -383,7 +385,9 @@ export function People({
         <td style={{ padding: "10px 16px" }}>
           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
             <IconButton icon="pencil" title="Edit" onClick={() => setEditing(s)} />
-            <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(s.id)} />
+            {canDelete && (
+              <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(s.id)} />
+            )}
           </div>
         </td>
       </tr>
