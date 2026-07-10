@@ -38,6 +38,9 @@ type repo interface {
 	CreateSuperAdminAuditEvent(ctx context.Context, actorID uuid.UUID, action, targetType string, targetID, tenantID *uuid.UUID, metadata map[string]any) error
 	ListSuperAdminAuditEvents(ctx context.Context, tenantID, actorID *uuid.UUID, action *string, limit int32) ([]SuperAdminAuditEvent, error)
 	CountTenantsByStatus(ctx context.Context) (map[string]int, error)
+	// InTx runs fn inside a single transaction, passing a tx-scoped repo. Used
+	// to make a platform mutation and its audit event atomic.
+	InTx(ctx context.Context, fn func(repo) error) error
 }
 
 var validRoles = map[string]bool{"admin": true, "manager": true, "employee": true}
@@ -283,12 +286,17 @@ func (s *Service) PlatformUpdateTenant(ctx context.Context, actorID, id uuid.UUI
 	if plan != nil && *plan == "" {
 		return Tenant{}, fmt.Errorf("%w: plan cannot be empty", ErrValidation)
 	}
-	tenant, err := s.repo.UpdateTenantPlatform(ctx, id, name, status, plan)
+	var tenant Tenant
+	err := s.repo.InTx(ctx, func(r repo) error {
+		var err error
+		tenant, err = r.UpdateTenantPlatform(ctx, id, name, status, plan)
+		if err != nil {
+			return err
+		}
+		metadata := changedFields(name, status, plan)
+		return r.CreateSuperAdminAuditEvent(ctx, actorID, "tenant.updated", "tenant", &tenant.ID, &tenant.ID, metadata)
+	})
 	if err != nil {
-		return Tenant{}, err
-	}
-	metadata := changedFields(name, status, plan)
-	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "tenant.updated", "tenant", &tenant.ID, &tenant.ID, metadata); err != nil {
 		return Tenant{}, err
 	}
 	return tenant, nil
@@ -311,11 +319,16 @@ func (s *Service) PlatformUpdateUser(ctx context.Context, actorID, userID uuid.U
 	if !validUserStatuses[status] {
 		return User{}, fmt.Errorf("%w: invalid status", ErrValidation)
 	}
-	user, err := s.repo.UpdateUserStatusPlatform(ctx, userID, status)
+	var user User
+	err := s.repo.InTx(ctx, func(r repo) error {
+		var err error
+		user, err = r.UpdateUserStatusPlatform(ctx, userID, status)
+		if err != nil {
+			return err
+		}
+		return r.CreateSuperAdminAuditEvent(ctx, actorID, "user.status_updated", "user", &user.ID, &user.TenantID, map[string]any{"status": status})
+	})
 	if err != nil {
-		return User{}, err
-	}
-	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "user.status_updated", "user", &user.ID, &user.TenantID, map[string]any{"status": status}); err != nil {
 		return User{}, err
 	}
 	return user, nil
@@ -337,20 +350,26 @@ func (s *Service) PlatformUpdateSubscription(ctx context.Context, actorID, id uu
 	if status != nil && *status == "" {
 		return PlatformSubscription{}, fmt.Errorf("%w: status cannot be empty", ErrValidation)
 	}
-	sub, err := s.repo.UpdateSubscriptionPlatform(ctx, id, plan, status)
+	var sub PlatformSubscription
+	err := s.repo.InTx(ctx, func(r repo) error {
+		var err error
+		sub, err = r.UpdateSubscriptionPlatform(ctx, id, plan, status)
+		if err != nil {
+			return err
+		}
+		metadata := changedFields(nil, status, plan)
+		return r.CreateSuperAdminAuditEvent(ctx, actorID, "subscription.updated", "subscription", &sub.ID, &sub.TenantID, metadata)
+	})
 	if err != nil {
 		return PlatformSubscription{}, err
 	}
+	// Enrich with tenant display fields (read-only, outside the write tx).
 	tenant, err := s.repo.GetTenantByID(ctx, sub.TenantID)
 	if err != nil {
 		return PlatformSubscription{}, err
 	}
 	sub.TenantName = tenant.Name
 	sub.TenantSlug = tenant.Slug
-	metadata := changedFields(nil, status, plan)
-	if err := s.repo.CreateSuperAdminAuditEvent(ctx, actorID, "subscription.updated", "subscription", &sub.ID, &sub.TenantID, metadata); err != nil {
-		return PlatformSubscription{}, err
-	}
 	return sub, nil
 }
 

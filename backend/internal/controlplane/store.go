@@ -18,11 +18,35 @@ import (
 // Store is the only place that touches the control-plane database. It wraps the
 // sqlc-generated queries and maps DB errors to the module's sentinel errors.
 type Store struct {
-	q *controlplanedb.Queries
+	// pool is nil on a transaction-scoped store returned inside InTx.
+	pool *pgxpool.Pool
+	q    *controlplanedb.Queries
 }
 
 func NewStore(pool *pgxpool.Pool) *Store {
-	return &Store{q: controlplanedb.New(pool)}
+	return &Store{pool: pool, q: controlplanedb.New(pool)}
+}
+
+// InTx runs fn inside a single control-plane transaction. The repo passed to fn
+// is scoped to that transaction, so a mutation and its audit event commit
+// together or roll back together. Committing only after fn succeeds is what
+// guarantees a state change is never persisted without its audit record.
+func (s *Store) InTx(ctx context.Context, fn func(repo) error) error {
+	if s.pool == nil {
+		return fmt.Errorf("InTx: store is not pool-backed")
+	}
+	tx, err := s.pool.Begin(ctx)
+	if err != nil {
+		return fmt.Errorf("begin tx: %w", err)
+	}
+	defer tx.Rollback(ctx) //nolint:errcheck // no-op once committed
+	if err := fn(&Store{q: s.q.WithTx(tx)}); err != nil {
+		return err
+	}
+	if err := tx.Commit(ctx); err != nil {
+		return fmt.Errorf("commit tx: %w", err)
+	}
+	return nil
 }
 
 func mapErr(err error) error {

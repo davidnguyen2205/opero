@@ -5,6 +5,7 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"maps"
 	"strings"
 	"testing"
 	"time"
@@ -23,7 +24,11 @@ type fakeRepo struct {
 	usersByTenantEmail map[string]User
 	platformUsersByID  map[uuid.UUID]PlatformUser
 	platformUsersEmail map[string]PlatformUser
+	subscriptionsByID  map[uuid.UUID]PlatformSubscription
 	auditEvents        []SuperAdminAuditEvent
+	// auditErr, when set, makes CreateSuperAdminAuditEvent fail — used to test
+	// that a mutation rolls back when its audit write fails.
+	auditErr error
 }
 
 func newFakeRepo() *fakeRepo {
@@ -34,7 +39,30 @@ func newFakeRepo() *fakeRepo {
 		usersByTenantEmail: map[string]User{},
 		platformUsersByID:  map[uuid.UUID]PlatformUser{},
 		platformUsersEmail: map[string]PlatformUser{},
+		subscriptionsByID:  map[uuid.UUID]PlatformSubscription{},
 	}
+}
+
+// InTx emulates a transaction: it snapshots the mutable state the platform
+// mutations touch, runs fn, and restores the snapshot if fn returns an error —
+// so a failed audit write leaves no partial state, mirroring the real store.
+func (f *fakeRepo) InTx(_ context.Context, fn func(repo) error) error {
+	tenants := maps.Clone(f.tenantsByID)
+	tenantsSlug := maps.Clone(f.tenantsBySlug)
+	users := maps.Clone(f.usersByID)
+	usersEmail := maps.Clone(f.usersByTenantEmail)
+	subs := maps.Clone(f.subscriptionsByID)
+	audit := append([]SuperAdminAuditEvent(nil), f.auditEvents...)
+	if err := fn(f); err != nil {
+		f.tenantsByID = tenants
+		f.tenantsBySlug = tenantsSlug
+		f.usersByID = users
+		f.usersByTenantEmail = usersEmail
+		f.subscriptionsByID = subs
+		f.auditEvents = audit
+		return err
+	}
+	return nil
 }
 
 func userKey(tenantID uuid.UUID, email string) string {
@@ -201,15 +229,42 @@ func (f *fakeRepo) GetPlatformUserByEmail(_ context.Context, email string) (Plat
 	return PlatformUser{}, ErrNotFound
 }
 
-func (f *fakeRepo) ListSubscriptionsPlatform(context.Context, *uuid.UUID, *string, *string) ([]PlatformSubscription, error) {
-	return nil, nil
+func (f *fakeRepo) ListSubscriptionsPlatform(_ context.Context, tenantID *uuid.UUID, plan, status *string) ([]PlatformSubscription, error) {
+	var out []PlatformSubscription
+	for _, sub := range f.subscriptionsByID {
+		if tenantID != nil && sub.TenantID != *tenantID {
+			continue
+		}
+		if plan != nil && sub.Plan != *plan {
+			continue
+		}
+		if status != nil && sub.Status != *status {
+			continue
+		}
+		out = append(out, sub)
+	}
+	return out, nil
 }
 
-func (f *fakeRepo) UpdateSubscriptionPlatform(context.Context, uuid.UUID, *string, *string) (PlatformSubscription, error) {
-	return PlatformSubscription{}, ErrNotFound
+func (f *fakeRepo) UpdateSubscriptionPlatform(_ context.Context, id uuid.UUID, plan, status *string) (PlatformSubscription, error) {
+	sub, ok := f.subscriptionsByID[id]
+	if !ok {
+		return PlatformSubscription{}, ErrNotFound
+	}
+	if plan != nil {
+		sub.Plan = *plan
+	}
+	if status != nil {
+		sub.Status = *status
+	}
+	f.subscriptionsByID[id] = sub
+	return sub, nil
 }
 
 func (f *fakeRepo) CreateSuperAdminAuditEvent(_ context.Context, actorID uuid.UUID, action, targetType string, targetID, tenantID *uuid.UUID, metadata map[string]any) error {
+	if f.auditErr != nil {
+		return f.auditErr
+	}
 	f.auditEvents = append(f.auditEvents, SuperAdminAuditEvent{
 		ID: uuid.New(), ActorPlatformUserID: actorID, Action: action,
 		TargetType: targetType, TargetID: targetID, TenantID: tenantID, Metadata: metadata,
@@ -432,5 +487,116 @@ func TestPlatformUpdateTenantWritesAudit(t *testing.T) {
 	}
 	if repo.auditEvents[0].Action != "tenant.updated" {
 		t.Fatalf("audit action = %q", repo.auditEvents[0].Action)
+	}
+}
+
+// seedPlatformActor creates a platform user and returns its id for use as an
+// audit actor.
+func seedPlatformActor(t *testing.T, svc *Service) uuid.UUID {
+	t.Helper()
+	actorID, err := svc.CreatePlatformUser(context.Background(), "ops@opero.test", "long-password", "ops")
+	if err != nil {
+		t.Fatalf("CreatePlatformUser: %v", err)
+	}
+	return actorID
+}
+
+func TestPlatformUpdateUserWritesAudit(t *testing.T) {
+	svc, repo, _ := newTestService()
+	res, err := svc.Signup(context.Background(), signupInput())
+	if err != nil {
+		t.Fatalf("Signup: %v", err)
+	}
+	actorID := seedPlatformActor(t, svc)
+
+	user, err := svc.PlatformUpdateUser(context.Background(), actorID, res.User.ID, "disabled")
+	if err != nil {
+		t.Fatalf("PlatformUpdateUser: %v", err)
+	}
+	if user.Status != "disabled" {
+		t.Fatalf("status = %q, want disabled", user.Status)
+	}
+	if len(repo.auditEvents) != 1 || repo.auditEvents[0].Action != "user.status_updated" {
+		t.Fatalf("audit events = %+v, want one user.status_updated", repo.auditEvents)
+	}
+	if repo.auditEvents[0].Metadata["status"] != "disabled" {
+		t.Fatalf("audit metadata = %+v, want status=disabled", repo.auditEvents[0].Metadata)
+	}
+}
+
+func TestPlatformUpdateUserRejectsInvalidStatus(t *testing.T) {
+	svc, repo, _ := newTestService()
+	res, err := svc.Signup(context.Background(), signupInput())
+	if err != nil {
+		t.Fatalf("Signup: %v", err)
+	}
+	actorID := seedPlatformActor(t, svc)
+
+	if _, err := svc.PlatformUpdateUser(context.Background(), actorID, res.User.ID, "banished"); !errors.Is(err, ErrValidation) {
+		t.Fatalf("err = %v, want ErrValidation", err)
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("no audit event should be written on validation failure, got %d", len(repo.auditEvents))
+	}
+}
+
+func TestPlatformUpdateUserRollsBackWhenAuditFails(t *testing.T) {
+	svc, repo, _ := newTestService()
+	res, err := svc.Signup(context.Background(), signupInput())
+	if err != nil {
+		t.Fatalf("Signup: %v", err)
+	}
+	actorID := seedPlatformActor(t, svc)
+	repo.auditErr = errors.New("audit insert failed")
+
+	if _, err := svc.PlatformUpdateUser(context.Background(), actorID, res.User.ID, "disabled"); err == nil {
+		t.Fatal("expected error when audit write fails")
+	}
+	// The status change must have rolled back with the failed audit write.
+	got, err := repo.GetUserByID(context.Background(), res.User.ID)
+	if err != nil {
+		t.Fatalf("GetUserByID: %v", err)
+	}
+	if got.Status == "disabled" {
+		t.Fatal("user status persisted despite audit failure — mutation was not atomic")
+	}
+	if len(repo.auditEvents) != 0 {
+		t.Fatalf("audit events = %d, want 0 after rollback", len(repo.auditEvents))
+	}
+}
+
+func TestPlatformUpdateSubscriptionWritesAudit(t *testing.T) {
+	svc, repo, _ := newTestService()
+	res, err := svc.Signup(context.Background(), signupInput())
+	if err != nil {
+		t.Fatalf("Signup: %v", err)
+	}
+	actorID := seedPlatformActor(t, svc)
+	subID := uuid.New()
+	repo.subscriptionsByID[subID] = PlatformSubscription{
+		ID: subID, TenantID: res.Tenant.ID, Plan: "free", Status: "active",
+	}
+
+	plan := "pro"
+	sub, err := svc.PlatformUpdateSubscription(context.Background(), actorID, subID, &plan, nil)
+	if err != nil {
+		t.Fatalf("PlatformUpdateSubscription: %v", err)
+	}
+	if sub.Plan != "pro" {
+		t.Fatalf("plan = %q, want pro", sub.Plan)
+	}
+	if sub.TenantName != res.Tenant.Name {
+		t.Fatalf("tenant name = %q, want %q", sub.TenantName, res.Tenant.Name)
+	}
+	if len(repo.auditEvents) != 1 || repo.auditEvents[0].Action != "subscription.updated" {
+		t.Fatalf("audit events = %+v, want one subscription.updated", repo.auditEvents)
+	}
+}
+
+func TestPlatformUpdateSubscriptionRequiresAField(t *testing.T) {
+	svc, _, _ := newTestService()
+	actorID := seedPlatformActor(t, svc)
+	if _, err := svc.PlatformUpdateSubscription(context.Background(), actorID, uuid.New(), nil, nil); !errors.Is(err, ErrValidation) {
+		t.Fatalf("err = %v, want ErrValidation", err)
 	}
 }
