@@ -83,29 +83,57 @@ func (f fakeResolver) EmployeeIDByUserID(context.Context, uuid.UUID) (uuid.UUID,
 	return f.empID, f.found, f.err
 }
 
-func newSvc(res fakeResolver) (*Service, *fakeRepo) {
+type shiftInfo struct {
+	empID  uuid.UUID
+	status string
+}
+
+type fakeShiftResolver struct {
+	shifts map[uuid.UUID]shiftInfo
+	calls  int
+	err    error
+}
+
+func newFakeShiftResolver() *fakeShiftResolver {
+	return &fakeShiftResolver{shifts: map[uuid.UUID]shiftInfo{}}
+}
+
+func (f *fakeShiftResolver) ShiftOwnerByID(_ context.Context, id uuid.UUID) (uuid.UUID, string, bool, error) {
+	f.calls++
+	if f.err != nil {
+		return uuid.Nil, "", false, f.err
+	}
+	s, ok := f.shifts[id]
+	if !ok {
+		return uuid.Nil, "", false, nil
+	}
+	return s.empID, s.status, true, nil
+}
+
+func newSvc(res fakeResolver) (*Service, *fakeRepo, *fakeShiftResolver) {
 	fr := newFakeRepo()
-	svc := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), res)
+	fs := newFakeShiftResolver()
+	svc := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), res, fs)
 	svc.newStore = func(context.Context) (repo, error) { return fr, nil }
-	return svc, fr
+	return svc, fr, fs
 }
 
 func TestCheckInRequiresClientID(t *testing.T) {
-	svc, _ := newSvc(fakeResolver{empID: uuid.New(), found: true})
+	svc, _, _ := newSvc(fakeResolver{empID: uuid.New(), found: true})
 	if _, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("err = %v, want ErrValidation", err)
 	}
 }
 
 func TestCheckInNoEmployeeLinked(t *testing.T) {
-	svc, _ := newSvc(fakeResolver{found: false})
+	svc, _, _ := newSvc(fakeResolver{found: false})
 	if _, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New()}); !errors.Is(err, ErrValidation) {
 		t.Fatalf("err = %v, want ErrValidation", err)
 	}
 }
 
 func TestCheckInIdempotent(t *testing.T) {
-	svc, _ := newSvc(fakeResolver{empID: uuid.New(), found: true})
+	svc, _, _ := newSvc(fakeResolver{empID: uuid.New(), found: true})
 	ctx, user, cid := context.Background(), uuid.New(), uuid.New()
 
 	r1, created, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid})
@@ -127,7 +155,7 @@ func TestCheckInClientIDReuseByAnotherEmployeeConflicts(t *testing.T) {
 	owner := uuid.New()
 	fr.byClient[cid] = Record{ID: uuid.New(), EmployeeID: owner, ClientID: cid, Status: "checked_in"}
 
-	svc := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), fakeResolver{empID: uuid.New(), found: true})
+	svc := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), fakeResolver{empID: uuid.New(), found: true}, newFakeShiftResolver())
 	svc.newStore = func(context.Context) (repo, error) { return fr, nil }
 
 	if _, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: cid}); !errors.Is(err, ErrConflict) {
@@ -135,9 +163,114 @@ func TestCheckInClientIDReuseByAnotherEmployeeConflicts(t *testing.T) {
 	}
 }
 
+func TestCheckInWithOwnPublishedShiftSucceeds(t *testing.T) {
+	emp := uuid.New()
+	svc, _, fs := newSvc(fakeResolver{empID: emp, found: true})
+	shiftID := uuid.New()
+	fs.shifts[shiftID] = shiftInfo{empID: emp, status: "published"}
+
+	rec, created, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New(), ShiftID: &shiftID})
+	if err != nil || !created {
+		t.Fatalf("check-in: created=%v err=%v", created, err)
+	}
+	if rec.ShiftID == nil || *rec.ShiftID != shiftID {
+		t.Errorf("record shift_id = %v, want %v", rec.ShiftID, shiftID)
+	}
+}
+
+func TestCheckInWithForeignShiftFailsValidation(t *testing.T) {
+	svc, fr, fs := newSvc(fakeResolver{empID: uuid.New(), found: true})
+	shiftID := uuid.New()
+	fs.shifts[shiftID] = shiftInfo{empID: uuid.New(), status: "published"} // someone else's shift
+
+	_, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New(), ShiftID: &shiftID})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("err = %v, want ErrValidation", err)
+	}
+	if len(fr.byClient) != 0 {
+		t.Errorf("record was created despite validation failure")
+	}
+}
+
+func TestCheckInWithOwnDraftShiftFailsValidation(t *testing.T) {
+	emp := uuid.New()
+	svc, fr, fs := newSvc(fakeResolver{empID: emp, found: true})
+	shiftID := uuid.New()
+	fs.shifts[shiftID] = shiftInfo{empID: emp, status: "draft"}
+
+	_, _, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New(), ShiftID: &shiftID})
+	if !errors.Is(err, ErrValidation) {
+		t.Fatalf("err = %v, want ErrValidation", err)
+	}
+	if len(fr.byClient) != 0 {
+		t.Errorf("record was created despite validation failure")
+	}
+}
+
+func TestCheckInWithNonexistentShiftFailsIndistinguishably(t *testing.T) {
+	emp := uuid.New()
+	svc, fr, fs := newSvc(fakeResolver{empID: emp, found: true})
+
+	missing := uuid.New()
+	_, _, missErr := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New(), ShiftID: &missing})
+	if !errors.Is(missErr, ErrValidation) {
+		t.Fatalf("nonexistent: err = %v, want ErrValidation", missErr)
+	}
+
+	foreign := uuid.New()
+	fs.shifts[foreign] = shiftInfo{empID: uuid.New(), status: "published"}
+	_, _, foreignErr := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New(), ShiftID: &foreign})
+	if !errors.Is(foreignErr, ErrValidation) {
+		t.Fatalf("foreign: err = %v, want ErrValidation", foreignErr)
+	}
+	// The two failure modes must be indistinguishable (no existence oracle).
+	if missErr.Error() != foreignErr.Error() {
+		t.Errorf("error text differs:\n nonexistent: %q\n foreign:     %q", missErr, foreignErr)
+	}
+	if len(fr.byClient) != 0 {
+		t.Errorf("record was created despite validation failure")
+	}
+}
+
+func TestCheckInWithoutShiftSkipsShiftLookup(t *testing.T) {
+	svc, _, fs := newSvc(fakeResolver{empID: uuid.New(), found: true})
+	if _, created, err := svc.CheckIn(context.Background(), uuid.New(), CheckInInput{ClientID: uuid.New()}); err != nil || !created {
+		t.Fatalf("check-in: created=%v err=%v", created, err)
+	}
+	if fs.calls != 0 {
+		t.Errorf("shift resolver called %d times, want 0", fs.calls)
+	}
+}
+
+func TestCheckInReplayWithShiftIDSkipsRevalidation(t *testing.T) {
+	emp := uuid.New()
+	svc, _, fs := newSvc(fakeResolver{empID: emp, found: true})
+	shiftID := uuid.New()
+	fs.shifts[shiftID] = shiftInfo{empID: emp, status: "published"}
+	ctx, user, cid := context.Background(), uuid.New(), uuid.New()
+
+	r1, created, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid, ShiftID: &shiftID})
+	if err != nil || !created {
+		t.Fatalf("first check-in: created=%v err=%v", created, err)
+	}
+	fs.calls = 0
+	fs.err = errors.New("resolver must not be called on replay")
+
+	r2, created2, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid, ShiftID: &shiftID})
+	if err != nil || created2 {
+		t.Fatalf("replay: created=%v err=%v (want created=false)", created2, err)
+	}
+	if r1.ID != r2.ID {
+		t.Errorf("replay returned a different record: %v vs %v", r1.ID, r2.ID)
+	}
+	if fs.calls != 0 {
+		t.Errorf("shift resolver called %d times on replay, want 0", fs.calls)
+	}
+}
+
 func TestSetBreakTogglesStatus(t *testing.T) {
 	emp := uuid.New()
-	svc, _ := newSvc(fakeResolver{empID: emp, found: true})
+	svc, _, _ := newSvc(fakeResolver{empID: emp, found: true})
 	ctx, user, cid := context.Background(), uuid.New(), uuid.New()
 	if _, _, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid}); err != nil {
 		t.Fatalf("check-in: %v", err)
@@ -162,7 +295,7 @@ func TestSetBreakTogglesStatus(t *testing.T) {
 
 func TestCheckOutIdempotentAndOwnership(t *testing.T) {
 	emp := uuid.New()
-	svc, fr := newSvc(fakeResolver{empID: emp, found: true})
+	svc, fr, _ := newSvc(fakeResolver{empID: emp, found: true})
 	ctx, user, cid := context.Background(), uuid.New(), uuid.New()
 	if _, _, err := svc.CheckIn(ctx, user, CheckInInput{ClientID: cid}); err != nil {
 		t.Fatalf("check-in: %v", err)
@@ -181,7 +314,7 @@ func TestCheckOutIdempotentAndOwnership(t *testing.T) {
 		t.Fatalf("unknown: err = %v, want ErrNotFound", err)
 	}
 	// another employee can't check out this record
-	other := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), fakeResolver{empID: uuid.New(), found: true})
+	other := NewService(slog.New(slog.NewTextHandler(io.Discard, nil)), fakeResolver{empID: uuid.New(), found: true}, newFakeShiftResolver())
 	other.newStore = func(context.Context) (repo, error) { return fr, nil }
 	if _, err := other.CheckOut(ctx, uuid.New(), CheckOutInput{ClientID: cid}); !errors.Is(err, ErrNotFound) {
 		t.Fatalf("cross-employee checkout: err = %v, want ErrNotFound", err)

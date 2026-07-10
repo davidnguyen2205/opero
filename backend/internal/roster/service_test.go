@@ -117,6 +117,31 @@ func newSvcWithFake() (*Service, *fakeRepo) {
 	return svc, f
 }
 
+func TestShiftOwnerByID(t *testing.T) {
+	svc, fr := newSvcWithFake()
+	ctx := context.Background()
+	emp := uuid.New()
+	sh := Shift{ID: uuid.New(), EmployeeID: emp, Status: "published"}
+	fr.shifts[sh.ID] = sh
+
+	ownerID, status, found, err := svc.ShiftOwnerByID(ctx, sh.ID)
+	if err != nil || !found {
+		t.Fatalf("existing shift: found=%v err=%v", found, err)
+	}
+	if ownerID != emp || status != "published" {
+		t.Errorf("got owner=%v status=%q, want owner=%v status=published", ownerID, status, emp)
+	}
+
+	// Not-found maps to found=false with no error (no cross-package sentinel).
+	ownerID, status, found, err = svc.ShiftOwnerByID(ctx, uuid.New())
+	if err != nil {
+		t.Fatalf("missing shift: err = %v, want nil", err)
+	}
+	if found || ownerID != uuid.Nil || status != "" {
+		t.Errorf("missing shift: got owner=%v status=%q found=%v, want zero values and found=false", ownerID, status, found)
+	}
+}
+
 func TestCreateLocationValidation(t *testing.T) {
 	svc, _ := newSvcWithFake()
 	if _, err := svc.CreateLocation(context.Background(), CreateLocationInput{Name: "  "}); !errors.Is(err, ErrValidation) {
