@@ -426,7 +426,7 @@ paths:
       summary: List departments.
       description: Returns all departments for the tenant. Org hierarchy is expressed via each department's nullable parent_id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The tenant's departments.
@@ -438,12 +438,14 @@ paths:
                   $ref: '#/components/schemas/Department'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createDepartment
       tags: [identity]
       summary: Create a department.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       requestBody:
         required: true
         content:
@@ -461,6 +463,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /departments/{id}:
     parameters:
@@ -470,7 +474,7 @@ paths:
       tags: [identity]
       summary: Get a department by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The department.
@@ -480,6 +484,8 @@ paths:
                 $ref: '#/components/schemas/Department'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -487,7 +493,7 @@ paths:
       tags: [identity]
       summary: Update a department.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       requestBody:
         required: true
         content:
@@ -505,6 +511,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -512,12 +520,14 @@ paths:
       tags: [identity]
       summary: Delete a department.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -528,7 +538,7 @@ paths:
       summary: List employees.
       description: Returns the tenant's employees, optionally filtered by department or status.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: department_id
           in: query
@@ -553,12 +563,14 @@ paths:
                   $ref: '#/components/schemas/Employee'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createEmployee
       tags: [identity]
       summary: Create an employee.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -576,6 +588,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /employees/{id}:
     parameters:
@@ -585,7 +599,7 @@ paths:
       tags: [identity]
       summary: Get an employee by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The employee.
@@ -595,6 +609,8 @@ paths:
                 $ref: '#/components/schemas/Employee'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -602,7 +618,7 @@ paths:
       tags: [identity]
       summary: Update an employee.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -620,6 +636,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -627,12 +645,14 @@ paths:
       tags: [identity]
       summary: Delete an employee.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -643,7 +663,7 @@ paths:
       summary: List roles.
       description: Returns the tenant's roles. Each role carries a set of permission keys (not yet enforced in v1).
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The tenant's roles.
@@ -655,12 +675,14 @@ paths:
                   $ref: '#/components/schemas/Role'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createRole
       tags: [identity]
       summary: Create a role.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       requestBody:
         required: true
         content:
@@ -678,6 +700,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           description: A role with this name already exists.
           content:
@@ -693,7 +717,7 @@ paths:
       tags: [identity]
       summary: Get a role by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The role.
@@ -703,6 +727,8 @@ paths:
                 $ref: '#/components/schemas/Role'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -710,7 +736,7 @@ paths:
       tags: [identity]
       summary: Update a role.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       requestBody:
         required: true
         content:
@@ -728,6 +754,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -736,12 +764,14 @@ paths:
       summary: Delete a role.
       description: Deletes a role. Employees assigned to it have their role cleared (set to null).
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -751,7 +781,7 @@ paths:
       tags: [roster]
       summary: List locations.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The tenant's locations.
@@ -763,12 +793,14 @@ paths:
                   $ref: '#/components/schemas/Location'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createLocation
       tags: [roster]
       summary: Create a location.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -786,6 +818,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /locations/{id}:
     parameters:
@@ -795,7 +829,7 @@ paths:
       tags: [roster]
       summary: Get a location by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The location.
@@ -805,6 +839,8 @@ paths:
                 $ref: '#/components/schemas/Location'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -812,7 +848,7 @@ paths:
       tags: [roster]
       summary: Update a location.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -830,6 +866,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -838,12 +876,14 @@ paths:
       summary: Delete a location.
       description: Deletes a location. Shifts at it have their location cleared (set to null).
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -856,7 +896,7 @@ paths:
         Lists shifts, optionally filtered by employee, status, and a
         [from, to) window on the shift start time.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: employee_id
           in: query
@@ -895,12 +935,14 @@ paths:
                   $ref: '#/components/schemas/Shift'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createShift
       tags: [roster]
       summary: Create a shift (starts as a draft).
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -918,6 +960,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /shifts/{id}:
     parameters:
@@ -927,7 +971,7 @@ paths:
       tags: [roster]
       summary: Get a shift by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The shift.
@@ -937,6 +981,8 @@ paths:
                 $ref: '#/components/schemas/Shift'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -945,7 +991,7 @@ paths:
       summary: Update a shift.
       description: Updates shift fields. Status transitions go through the publish endpoint, not here.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -963,6 +1009,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -970,12 +1018,14 @@ paths:
       tags: [roster]
       summary: Delete a shift.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -988,7 +1038,7 @@ paths:
       summary: Publish a shift.
       description: Transitions a shift to published, making it visible to the assigned staff. Idempotent.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The published shift.
@@ -998,6 +1048,8 @@ paths:
                 $ref: '#/components/schemas/Shift'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1014,7 +1066,7 @@ paths:
         on the mobile app). Fails if the employee already has a login or the
         email is already taken in this tenant.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["admin"]
       requestBody:
         required: true
         content:
@@ -1032,6 +1084,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '409':
@@ -1048,7 +1102,7 @@ paths:
       summary: List attendance records.
       description: Lists attendance records, optionally filtered by employee, status, and a [from, to) window on check-in time.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: employee_id
           in: query
@@ -1087,6 +1141,8 @@ paths:
                   $ref: '#/components/schemas/AttendanceRecord'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /attendance/check-in:
     post:
@@ -1249,7 +1305,7 @@ paths:
         timezone). Shifts that started before the window (e.g. overnight) are
         not included — the filter is on shift start time.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: from
           in: query
@@ -1276,6 +1332,8 @@ paths:
                   $ref: '#/components/schemas/LiveViewEntry'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /me/leave:
     get:
@@ -1353,7 +1411,7 @@ paths:
       summary: List leave requests (manager).
       description: All leave requests in the tenant, newest first, optionally filtered by status or employee.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: status
           in: query
@@ -1377,6 +1435,8 @@ paths:
                   $ref: '#/components/schemas/LeaveRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /leave/{id}/approve:
     parameters:
@@ -1387,7 +1447,7 @@ paths:
       summary: Approve a leave request (manager).
       description: Marks a pending request approved and records the reviewing user and time. Idempotent on an already-approved request.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The updated leave request.
@@ -1399,6 +1459,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1411,7 +1473,7 @@ paths:
       summary: Reject a leave request (manager).
       description: Marks a pending request rejected and records the reviewing user and time. Idempotent on an already-rejected request.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The updated leave request.
@@ -1423,6 +1485,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1433,7 +1497,7 @@ paths:
       summary: List tours in the catalog.
       description: The tenant's tour catalog, optionally filtered by category or active flag. Ordered by name.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       parameters:
         - name: category
           in: query
@@ -1456,12 +1520,14 @@ paths:
                   $ref: '#/components/schemas/Tour'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
     post:
       operationId: createTour
       tags: [tours]
       summary: Create a tour.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -1479,6 +1545,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /tours/{id}:
     parameters:
@@ -1488,7 +1556,7 @@ paths:
       tags: [tours]
       summary: Get a tour by id.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '200':
           description: The tour.
@@ -1498,6 +1566,8 @@ paths:
                 $ref: '#/components/schemas/Tour'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     patch:
@@ -1505,7 +1575,7 @@ paths:
       tags: [tours]
       summary: Update a tour.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       requestBody:
         required: true
         content:
@@ -1523,6 +1593,8 @@ paths:
           $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
     delete:
@@ -1530,12 +1602,14 @@ paths:
       tags: [tours]
       summary: Delete a tour.
       security:
-        - bearerAuth: []
+        - bearerAuth: ["manager"]
       responses:
         '204':
           description: Deleted.
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
 
@@ -1612,6 +1686,14 @@ components:
             $ref: '#/components/schemas/Error'
     Unauthorized:
       description: Authentication failed or is missing.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/Error'
+    Forbidden:
+      description: >
+        The caller is authenticated but their role is not permitted to perform
+        this operation.
       content:
         application/json:
           schema:

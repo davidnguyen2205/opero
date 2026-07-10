@@ -53,6 +53,7 @@ function DeptDetailDrawer({
   members,
   parentName,
   leadName,
+  canManage,
   onClose,
   onEdit,
   onDelete,
@@ -61,6 +62,7 @@ function DeptDetailDrawer({
   members: Employee[];
   parentName: string | null;
   leadName: string | null;
+  canManage: boolean;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -96,22 +98,24 @@ function DeptDetailDrawer({
         </>
       }
       footer={
-        <>
-          <Btn
-            variant="secondary"
-            icon="x"
-            style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
-            onClick={() => {
-              onDelete();
-              onClose();
-            }}
-          >
-            Delete
-          </Btn>
-          <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
-            Edit Department
-          </Btn>
-        </>
+        canManage ? (
+          <>
+            <Btn
+              variant="secondary"
+              icon="x"
+              style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              Delete
+            </Btn>
+            <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
+              Edit Department
+            </Btn>
+          </>
+        ) : undefined
       }
     >
       {dept.description && (
@@ -325,6 +329,7 @@ function DeptList({
   membersOf,
   nameById,
   leadName,
+  canManage,
   onSelect,
   onEdit,
   onDelete,
@@ -333,6 +338,7 @@ function DeptList({
   membersOf: (d: Department) => Employee[];
   nameById: Map<string, string>;
   leadName: (d: Department) => string | null;
+  canManage: boolean;
   onSelect: (d: Department) => void;
   onEdit: (d: Department) => void;
   onDelete: (id: string) => void;
@@ -416,10 +422,14 @@ function DeptList({
                     {dep.parent_id ? nameById.get(dep.parent_id) ?? "Unknown" : "—"}
                   </td>
                   <td style={{ padding: "11px 16px", textAlign: "right" }}>
-                    <div style={{ display: "inline-flex", gap: 6 }}>
-                      <IconButton icon="pencil" title="Edit" onClick={() => onEdit(dep)} />
-                      <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(dep.id)} />
-                    </div>
+                    {canManage ? (
+                      <div style={{ display: "inline-flex", gap: 6 }}>
+                        <IconButton icon="pencil" title="Edit" onClick={() => onEdit(dep)} />
+                        <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(dep.id)} />
+                      </div>
+                    ) : (
+                      <span style={{ color: "var(--adaptive-300)" }}>—</span>
+                    )}
                   </td>
                 </tr>
               );
@@ -434,12 +444,14 @@ function DeptList({
 export function Departments({
   departments,
   employees,
+  canManage,
   onCreate,
   onUpdate,
   onDelete,
 }: {
   departments: Department[];
   employees: Employee[];
+  canManage: boolean;
   onCreate: (body: CreateDepartmentRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateDepartmentRequest) => Promise<void>;
   onDelete: (id: string) => void;
@@ -463,9 +475,11 @@ export function Departments({
         actions={
           <>
             <ViewToggle value={layout} onChange={setLayout} />
-            <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
-              Add department
-            </Btn>
+            {canManage && (
+              <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
+                Add department
+              </Btn>
+            )}
           </>
         }
       />
@@ -480,6 +494,7 @@ export function Departments({
           membersOf={membersOf}
           nameById={nameById}
           leadName={leadName}
+          canManage={canManage}
           onSelect={setSel}
           onEdit={(d) => setEditing(d)}
           onDelete={onDelete}
@@ -514,7 +529,7 @@ export function Departments({
                       {lead ? ` · Lead ${lead}` : ""}
                     </div>
                   </div>
-                  <IconButton icon="pencil" title="Edit" onClick={() => setEditing(dep)} />
+                  {canManage && <IconButton icon="pencil" title="Edit" onClick={() => setEditing(dep)} />}
                 </div>
                 {dep.description && (
                   <div
@@ -566,6 +581,7 @@ export function Departments({
           members={membersOf(sel)}
           parentName={sel.parent_id ? nameById.get(sel.parent_id) ?? null : null}
           leadName={leadName(sel)}
+          canManage={canManage}
           onClose={() => setSel(null)}
           onEdit={() => {
             setEditing(sel);

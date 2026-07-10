@@ -84,7 +84,8 @@ func securedChain(d Deps) oapi.MiddlewareFunc {
 	tenant := appmw.TenantResolver(d.TenantRegistry, d.TenantPools, d.Logger)
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			if _, secured := r.Context().Value(oapi.BearerAuthScopes).([]string); !secured {
+			scopes, secured := r.Context().Value(oapi.BearerAuthScopes).([]string)
+			if !secured {
 				next.ServeHTTP(w, r)
 				return
 			}
@@ -95,6 +96,12 @@ func securedChain(d Deps) oapi.MiddlewareFunc {
 			}
 			if isTenantRoute(d.TenantRoutePrefixes, r.URL.Path) {
 				h = tenant(h)
+			}
+			// Coarse role gate sits inside authn (needs claims) but outside
+			// tenant resolution. Empty scopes (self-service and all /platform/*
+			// routes) are not gated here.
+			if len(scopes) > 0 {
+				h = appmw.Authorizer(d.Logger, scopes)(h)
 			}
 			authn(h).ServeHTTP(w, r)
 		})

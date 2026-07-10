@@ -83,3 +83,14 @@ func WriteUnauthorized(w http.ResponseWriter) {
 		"message": "authentication required",
 	})
 }
+
+// WriteForbidden writes a 403 JSON error for an authenticated caller whose role
+// does not satisfy the operation's minimum-role requirement.
+func WriteForbidden(w http.ResponseWriter) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusForbidden)
+	_ = json.NewEncoder(w).Encode(map[string]string{
+		"code":    "forbidden",
+		"message": "insufficient role",
+	})
+}

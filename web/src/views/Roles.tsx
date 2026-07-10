@@ -39,6 +39,7 @@ function RoleDetailDrawer({
   role,
   members,
   departmentName,
+  canManage,
   onClose,
   onEdit,
   onDelete,
@@ -46,6 +47,7 @@ function RoleDetailDrawer({
   role: Role;
   members: Employee[];
   departmentName: string | null;
+  canManage: boolean;
   onClose: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -69,22 +71,24 @@ function RoleDetailDrawer({
         </>
       }
       footer={
-        <>
-          <Btn
-            variant="secondary"
-            icon="x"
-            style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
-            onClick={() => {
-              onDelete();
-              onClose();
-            }}
-          >
-            Delete
-          </Btn>
-          <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
-            Edit Role
-          </Btn>
-        </>
+        canManage ? (
+          <>
+            <Btn
+              variant="secondary"
+              icon="x"
+              style={{ color: "var(--red-700)", borderColor: "var(--red-200)" }}
+              onClick={() => {
+                onDelete();
+                onClose();
+              }}
+            >
+              Delete
+            </Btn>
+            <Btn variant="primary" icon="pencil" style={{ marginLeft: "auto" }} onClick={onEdit}>
+              Edit Role
+            </Btn>
+          </>
+        ) : undefined
       }
     >
       {role.description && (
@@ -271,6 +275,7 @@ export function Roles({
   roles,
   employees,
   departments,
+  canManage,
   onCreate,
   onUpdate,
   onDelete,
@@ -278,6 +283,7 @@ export function Roles({
   roles: Role[];
   employees: Employee[];
   departments: Department[];
+  canManage: boolean;
   onCreate: (body: CreateRoleRequest) => Promise<void>;
   onUpdate: (id: string, body: UpdateRoleRequest) => Promise<void>;
   onDelete: (id: string) => void;
@@ -302,9 +308,11 @@ export function Roles({
         title="Roles"
         subtitle={`${roles.length} role${roles.length === 1 ? "" : "s"}`}
         actions={
-          <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
-            Add role
-          </Btn>
+          canManage ? (
+            <Btn variant="primary" icon="plus" onClick={() => setEditing("new")}>
+              Add role
+            </Btn>
+          ) : null
         }
       />
 
@@ -389,10 +397,14 @@ export function Roles({
                         {r.permissions.length} granted
                       </td>
                       <td style={{ padding: "12px 16px", textAlign: "right" }}>
-                        <div style={{ display: "inline-flex", gap: 6 }}>
-                          <IconButton icon="pencil" title="Edit" onClick={() => setEditing(r)} />
-                          <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(r.id)} />
-                        </div>
+                        {canManage ? (
+                          <div style={{ display: "inline-flex", gap: 6 }}>
+                            <IconButton icon="pencil" title="Edit" onClick={() => setEditing(r)} />
+                            <IconButton icon="x" title="Delete" tone="danger" onClick={() => onDelete(r.id)} />
+                          </div>
+                        ) : (
+                          <span style={{ color: "var(--adaptive-300)" }}>—</span>
+                        )}
                       </td>
                     </tr>
                   );
@@ -408,6 +420,7 @@ export function Roles({
           role={sel}
           members={membersOf(sel)}
           departmentName={sel.department_id ? deptName.get(sel.department_id) ?? null : null}
+          canManage={canManage}
           onClose={() => setSel(null)}
           onEdit={() => {
             setEditing(sel);
