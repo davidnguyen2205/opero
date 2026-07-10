@@ -2,6 +2,7 @@ package roster
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -136,6 +137,24 @@ func (s *Service) GetShift(ctx context.Context, id uuid.UUID) (Shift, error) {
 		return Shift{}, err
 	}
 	return st.GetShift(ctx, id)
+}
+
+// ShiftOwnerByID reports the owning employee id and status of a shift.
+// Satisfies attendance.ShiftResolver: not-found is returned as found=false
+// rather than a sentinel error so callers needn't import this package's errors.
+func (s *Service) ShiftOwnerByID(ctx context.Context, id uuid.UUID) (uuid.UUID, string, bool, error) {
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return uuid.Nil, "", false, err
+	}
+	sh, err := st.GetShift(ctx, id)
+	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			return uuid.Nil, "", false, nil
+		}
+		return uuid.Nil, "", false, fmt.Errorf("looking up shift owner: %w", err)
+	}
+	return sh.EmployeeID, sh.Status, true, nil
 }
 
 func (s *Service) ListShifts(ctx context.Context, f ShiftFilter) ([]Shift, error) {

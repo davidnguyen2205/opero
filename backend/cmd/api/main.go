@@ -69,7 +69,7 @@ func run() error {
 	rosterService := roster.NewService(logger, identityService) // resolves employee for /me/shifts
 	rosterHandler := roster.NewHandler(rosterService, logger)
 
-	attendanceService := attendance.NewService(logger, identityService) // resolves employee from user
+	attendanceService := attendance.NewService(logger, identityService, rosterService) // resolves employee from user; validates shift ownership
 	attendanceHandler := attendance.NewHandler(attendanceService, logger)
 
 	// liveview owns no tables; it composes roster + attendance + identity.

@@ -71,7 +71,8 @@ func TestFullLifecycleCreateEmployee(t *testing.T) {
 	prov := controlplane.NewProvisioner(pool, cfg.DSN, logger)
 	cpSvc := controlplane.NewService(store, prov, tokens, cfg.TenantDBPrefix, logger)
 	idSvc := identity.NewService(logger, cpSvc)
-	atSvc := attendance.NewService(logger, idSvc)
+	rsSvc := roster.NewService(logger, idSvc)
+	atSvc := attendance.NewService(logger, idSvc, rsSvc)
 	resolver := platdb.NewTenantResolver(cfg.DSN)
 
 	api := &apiHandler{
@@ -169,7 +170,8 @@ func TestM4AttendanceLifecycle(t *testing.T) {
 	prov := controlplane.NewProvisioner(pool, cfg.DSN, logger)
 	cpSvc := controlplane.NewService(store, prov, tokens, cfg.TenantDBPrefix, logger)
 	idSvc := identity.NewService(logger, cpSvc)
-	atSvc := attendance.NewService(logger, idSvc)
+	rsSvc := roster.NewService(logger, idSvc)
+	atSvc := attendance.NewService(logger, idSvc, rsSvc)
 	resolver := platdb.NewTenantResolver(cfg.DSN)
 	api := &apiHandler{
 		cp: controlplane.NewHandler(cpSvc, logger),
@@ -337,7 +339,7 @@ func TestM5LiveView(t *testing.T) {
 	cpSvc := controlplane.NewService(store, prov, tokens, cfg.TenantDBPrefix, logger)
 	idSvc := identity.NewService(logger, cpSvc)
 	rsSvc := roster.NewService(logger, idSvc)
-	atSvc := attendance.NewService(logger, idSvc)
+	atSvc := attendance.NewService(logger, idSvc, rsSvc)
 	lvSvc := liveview.NewService(rsSvc, atSvc, idSvc)
 	resolver := platdb.NewTenantResolver(cfg.DSN)
 	api := &apiHandler{

@@ -28,14 +28,22 @@ type EmployeeResolver interface {
 	EmployeeIDByUserID(ctx context.Context, userID uuid.UUID) (uuid.UUID, bool, error)
 }
 
+// ShiftResolver reports who a shift belongs to and its status. Satisfied by
+// roster.Service. Not-found is a bool rather than a cross-package sentinel
+// error so this module needn't import roster.
+type ShiftResolver interface {
+	ShiftOwnerByID(ctx context.Context, id uuid.UUID) (employeeID uuid.UUID, status string, found bool, err error)
+}
+
 type Service struct {
 	newStore  func(ctx context.Context) (repo, error)
 	employees EmployeeResolver
+	shifts    ShiftResolver
 	logger    *slog.Logger
 }
 
-func NewService(logger *slog.Logger, employees EmployeeResolver) *Service {
-	s := &Service{logger: logger, employees: employees}
+func NewService(logger *slog.Logger, employees EmployeeResolver, shifts ShiftResolver) *Service {
+	s := &Service{logger: logger, employees: employees, shifts: shifts}
 	s.newStore = s.tenantStore
 	return s
 }
@@ -58,6 +66,20 @@ func (s *Service) resolveEmployee(ctx context.Context, userID uuid.UUID) (uuid.U
 		return uuid.Nil, fmt.Errorf("%w: no employee is linked to this account", ErrValidation)
 	}
 	return empID, nil
+}
+
+// validateOwnShift verifies the shift exists, belongs to empID, and is
+// published. All three failures return one indistinguishable validation error
+// so check-in can't be used as an existence oracle for other employees' shifts.
+func (s *Service) validateOwnShift(ctx context.Context, empID, shiftID uuid.UUID) error {
+	ownerID, status, found, err := s.shifts.ShiftOwnerByID(ctx, shiftID)
+	if err != nil {
+		return fmt.Errorf("resolving shift for check-in: %w", err)
+	}
+	if !found || ownerID != empID || status != "published" {
+		return fmt.Errorf("%w: shift_id does not reference one of your published shifts", ErrValidation)
+	}
+	return nil
 }
 
 // CheckIn records (idempotently) a check-in for the authenticated user's
@@ -84,6 +106,14 @@ func (s *Service) CheckIn(ctx context.Context, userID uuid.UUID, in CheckInInput
 		return existing, false, nil // idempotent replay
 	case !errors.Is(err, ErrNotFound):
 		return Record{}, false, err
+	}
+
+	// Only validate before the insert; the idempotent-replay path above returns
+	// a record that was already ownership-checked at creation time.
+	if in.ShiftID != nil {
+		if err := s.validateOwnShift(ctx, empID, *in.ShiftID); err != nil {
+			return Record{}, false, err
+		}
 	}
 
 	rec, err := st.CreateCheckIn(ctx, empID, in)
