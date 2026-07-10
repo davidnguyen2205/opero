@@ -49,7 +49,9 @@ export const platformApi = createClient<paths>({ baseUrl });
 
 const platformAuthMiddleware: Middleware = {
   onRequest({ request }) {
-    if (platformToken) {
+    // Gate the platform token on the path so it can only ever go to /platform/*
+    // requests — enforced by code, not just by which calls use this client.
+    if (platformToken && new URL(request.url).pathname.includes("/platform/")) {
       request.headers.set("Authorization", `Bearer ${platformToken}`);
     }
     return request;

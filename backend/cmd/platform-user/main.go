@@ -2,11 +2,13 @@
 package main
 
 import (
+	"bufio"
 	"context"
 	"flag"
 	"fmt"
 	"log/slog"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/davidnguyen2205/opero/backend/internal/controlplane"
@@ -29,12 +31,22 @@ func main() {
 
 func run() error {
 	email := flag.String("email", "", "platform user email")
-	password := flag.String("password", "", "platform user password")
 	role := flag.String("role", "super_admin", "platform user role: super_admin, support, or ops")
 	flag.Parse()
 
-	if *email == "" || *password == "" {
-		return fmt.Errorf("-email and -password are required")
+	if *email == "" {
+		return fmt.Errorf("-email is required")
+	}
+
+	// The password is read from the PLATFORM_USER_PASSWORD env var, or from
+	// stdin if unset — never a CLI flag, which would leak into `ps` output and
+	// shell history.
+	password, err := readPassword()
+	if err != nil {
+		return err
+	}
+	if password == "" {
+		return fmt.Errorf("password is required (set PLATFORM_USER_PASSWORD or pipe it on stdin)")
 	}
 
 	cfg, err := config.Load()
@@ -56,10 +68,25 @@ func run() error {
 	tokens := auth.NewTokenManager(cfg.JWTSecret, cfg.JWTIssuer, cfg.JWTTTL)
 	svc := controlplane.NewService(store, noopProvisioner{}, tokens, cfg.TenantDBPrefix, logger)
 
-	id, err := svc.CreatePlatformUser(ctx, *email, *password, *role)
+	id, err := svc.CreatePlatformUser(ctx, *email, password, *role)
 	if err != nil {
 		return err
 	}
 	fmt.Printf("created platform user %s (%s)\n", id, *role)
 	return nil
+}
+
+// readPassword returns the platform user's password from the
+// PLATFORM_USER_PASSWORD env var, or the first line of stdin if the var is
+// unset. Kept off the command line so it never appears in `ps` or shell history.
+func readPassword() (string, error) {
+	if v := os.Getenv("PLATFORM_USER_PASSWORD"); v != "" {
+		return v, nil
+	}
+	fmt.Fprint(os.Stderr, "Password: ")
+	line, err := bufio.NewReader(os.Stdin).ReadString('\n')
+	if err != nil && line == "" {
+		return "", fmt.Errorf("read password from stdin: %w", err)
+	}
+	return strings.TrimRight(line, "\r\n"), nil
 }
