@@ -289,7 +289,7 @@ func (h *Handler) CreateEmployeeLogin(w http.ResponseWriter, r *http.Request, id
 	if body.Role != nil {
 		role = string(*body.Role)
 	}
-	res, err := h.svc.CreateEmployeeLogin(r.Context(), claims.TenantID, id, string(body.Email), body.Password, role)
+	res, err := h.svc.CreateEmployeeLogin(r.Context(), claims.TenantIDValue(), id, string(body.Email), body.Password, role)
 	if err != nil {
 		h.writeServiceError(w, r, err)
 		return

@@ -37,8 +37,11 @@ func TestTokenIssueParse(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Parse: %v", err)
 	}
-	if claims.TenantID != tenantID {
+	if claims.TenantID == nil || *claims.TenantID != tenantID {
 		t.Errorf("TenantID = %v, want %v", claims.TenantID, tenantID)
+	}
+	if claims.TenantIDValue() != tenantID {
+		t.Errorf("TenantIDValue = %v, want %v", claims.TenantIDValue(), tenantID)
 	}
 	if claims.Kind != "tenant" {
 		t.Errorf("Kind = %q, want tenant", claims.Kind)
@@ -75,8 +78,11 @@ func TestPlatformTokenIssueParse(t *testing.T) {
 	if claims.Kind != "platform" {
 		t.Errorf("Kind = %q, want platform", claims.Kind)
 	}
-	if claims.TenantID != uuid.Nil {
-		t.Errorf("TenantID = %v, want nil", claims.TenantID)
+	if claims.TenantID != nil {
+		t.Errorf("TenantID = %v, want nil (platform tokens must omit tenant_id)", claims.TenantID)
+	}
+	if claims.TenantIDValue() != uuid.Nil {
+		t.Errorf("TenantIDValue = %v, want uuid.Nil", claims.TenantIDValue())
 	}
 	gotUser, err := claims.PlatformUserID()
 	if err != nil {

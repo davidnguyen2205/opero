@@ -37,7 +37,7 @@ func TenantResolver(reg TenantRegistry, pools TenantPools, logger *slog.Logger) 
 				WriteUnauthorized(w)
 				return
 			}
-			dbName, err := reg.TenantDBName(r.Context(), claims.TenantID)
+			dbName, err := reg.TenantDBName(r.Context(), claims.TenantIDValue())
 			if err != nil {
 				logger.ErrorContext(r.Context(), "tenant db lookup failed", slog.Any("error", err))
 				writeServiceUnavailable(w)

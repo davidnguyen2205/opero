@@ -45,7 +45,7 @@ func (h *Handler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "authentication required")
 		return
 	}
-	tenantID := claims.TenantID
+	tenantID := claims.TenantIDValue()
 	if tenantID == uuid.Nil {
 		writeError(w, http.StatusUnauthorized, "unauthorized", "token is not scoped to a tenant")
 		return
