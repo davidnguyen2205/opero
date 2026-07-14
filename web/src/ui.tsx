@@ -35,7 +35,8 @@ export type IconName =
   | "pencil"
   | "wifi"
   | "mail"
-  | "lock";
+  | "lock"
+  | "moon";
 
 const ICON_PATHS: Record<IconName, string> = {
   activity: "M22 12h-4l-3 9L9 3l-3 9H2",
@@ -75,6 +76,7 @@ const ICON_PATHS: Record<IconName, string> = {
   wifi: "M5 12.55a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01",
   mail: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6",
   lock: "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM7 11V7a5 5 0 0 1 10 0v4",
+  moon: "M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z",
 };
 
 export function Icon({
@@ -321,6 +323,7 @@ export function Btn({
   style,
   disabled,
   type = "button",
+  title,
 }: {
   children?: ReactNode;
   variant?: BtnVariant;
@@ -330,6 +333,7 @@ export function Btn({
   style?: CSSProperties;
   disabled?: boolean;
   type?: "button" | "submit";
+  title?: string;
 }) {
   const [hover, setHover] = useState(false);
   const sizes: Record<BtnSize, { h: number; px: number; fs: number }> = {
@@ -378,6 +382,8 @@ export function Btn({
   return (
     <button
       type={type}
+      title={title}
+      aria-label={title}
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       onMouseEnter={() => setHover(true)}

@@ -40,6 +40,7 @@ func (h *Handler) GetLiveView(w http.ResponseWriter, r *http.Request, params oap
 			CheckOutAt:       e.CheckOutAt,
 			CheckInLat:       e.CheckInLat,
 			CheckInLng:       e.CheckInLng,
+			BreakStartedAt:   e.BreakStartedAt,
 		})
 	}
 	writeJSON(w, http.StatusOK, out)

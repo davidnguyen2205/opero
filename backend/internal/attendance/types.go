@@ -31,6 +31,7 @@ type Record struct {
 	CheckOutLat      *float64
 	CheckOutLng      *float64
 	CheckOutPhotoURL *string
+	BreakStartedAt   *time.Time
 	Status           string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time

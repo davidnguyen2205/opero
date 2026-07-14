@@ -86,6 +86,7 @@ func recordFromDB(a attendancedb.AttendanceRecord) Record {
 		CheckOutLat:      a.CheckOutLat,
 		CheckOutLng:      a.CheckOutLng,
 		CheckOutPhotoURL: a.CheckOutPhotoUrl,
+		BreakStartedAt:   fromPgTimestamptz(a.BreakStartedAt),
 		Status:           a.Status,
 		CreatedAt:        a.CreatedAt,
 		UpdatedAt:        a.UpdatedAt,

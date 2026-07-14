@@ -157,8 +157,8 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (auth: AuthRe
         display: "flex",
         flexDirection: "column",
         alignItems: "center",
-        // Warm cream page ground, same value as the Blazeup login layout.
-        background: "#fefbf6",
+        // Warm cream in light (Blazeup login layout), near-black in dark.
+        background: "var(--auth-ground)",
         padding: "24px 20px",
       }}
     >

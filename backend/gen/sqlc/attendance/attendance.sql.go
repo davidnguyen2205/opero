@@ -19,9 +19,10 @@ UPDATE attendance_records SET
     check_out_lng       = $3,
     check_out_photo_url = $4,
     status              = 'checked_out',
+    break_started_at    = NULL,
     updated_at          = now()
 WHERE client_id = $1
-RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at
+RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at
 `
 
 type CheckOutParams struct {
@@ -55,6 +56,7 @@ func (q *Queries) CheckOut(ctx context.Context, arg CheckOutParams) (AttendanceR
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BreakStartedAt,
 	)
 	return i, err
 }
@@ -65,7 +67,7 @@ INSERT INTO attendance_records (
     check_in_at, check_in_lat, check_in_lng, check_in_photo_url, status
 )
 VALUES ($1, $2, $3, now(), $4, $5, $6, 'checked_in')
-RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at
+RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at
 `
 
 type CreateCheckInParams struct {
@@ -103,12 +105,13 @@ func (q *Queries) CreateCheckIn(ctx context.Context, arg CreateCheckInParams) (A
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BreakStartedAt,
 	)
 	return i, err
 }
 
 const getAttendance = `-- name: GetAttendance :one
-SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at FROM attendance_records WHERE id = $1
+SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at FROM attendance_records WHERE id = $1
 `
 
 func (q *Queries) GetAttendance(ctx context.Context, id uuid.UUID) (AttendanceRecord, error) {
@@ -130,12 +133,13 @@ func (q *Queries) GetAttendance(ctx context.Context, id uuid.UUID) (AttendanceRe
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BreakStartedAt,
 	)
 	return i, err
 }
 
 const getAttendanceByClientID = `-- name: GetAttendanceByClientID :one
-SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at FROM attendance_records WHERE client_id = $1
+SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at FROM attendance_records WHERE client_id = $1
 `
 
 func (q *Queries) GetAttendanceByClientID(ctx context.Context, clientID uuid.UUID) (AttendanceRecord, error) {
@@ -157,12 +161,13 @@ func (q *Queries) GetAttendanceByClientID(ctx context.Context, clientID uuid.UUI
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BreakStartedAt,
 	)
 	return i, err
 }
 
 const listAttendance = `-- name: ListAttendance :many
-SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at FROM attendance_records
+SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at FROM attendance_records
 WHERE ($1::uuid IS NULL OR employee_id = $1)
   AND ($2::text IS NULL OR status = $2)
   AND ($3::timestamptz IS NULL OR check_in_at >= $3)
@@ -207,6 +212,7 @@ func (q *Queries) ListAttendance(ctx context.Context, arg ListAttendanceParams) 
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BreakStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -219,7 +225,7 @@ func (q *Queries) ListAttendance(ctx context.Context, arg ListAttendanceParams) 
 }
 
 const listAttendanceByShiftIDs = `-- name: ListAttendanceByShiftIDs :many
-SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at FROM attendance_records
+SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at FROM attendance_records
 WHERE shift_id = ANY($1::uuid[])
 `
 
@@ -251,6 +257,7 @@ func (q *Queries) ListAttendanceByShiftIDs(ctx context.Context, dollar_1 []uuid.
 			&i.Status,
 			&i.CreatedAt,
 			&i.UpdatedAt,
+			&i.BreakStartedAt,
 		); err != nil {
 			return nil, err
 		}
@@ -264,11 +271,12 @@ func (q *Queries) ListAttendanceByShiftIDs(ctx context.Context, dollar_1 []uuid.
 
 const setAttendanceStatus = `-- name: SetAttendanceStatus :one
 UPDATE attendance_records SET
-    status     = $1,
-    updated_at = now()
+    status           = $1,
+    break_started_at = CASE WHEN $1 = 'on_break' THEN now() END,
+    updated_at       = now()
 WHERE client_id = $2
   AND status IN ('checked_in', 'on_break')
-RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at
+RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at
 `
 
 type SetAttendanceStatusParams struct {
@@ -277,7 +285,8 @@ type SetAttendanceStatusParams struct {
 }
 
 // Toggle break state for an open record. Only moves between checked_in and
-// on_break (a checked-out/missed record is left unchanged).
+// on_break (a checked-out/missed record is left unchanged). break_started_at
+// tracks the current break: stamped on entry, cleared on resume.
 func (q *Queries) SetAttendanceStatus(ctx context.Context, arg SetAttendanceStatusParams) (AttendanceRecord, error) {
 	row := q.db.QueryRow(ctx, setAttendanceStatus, arg.Status, arg.ClientID)
 	var i AttendanceRecord
@@ -297,6 +306,7 @@ func (q *Queries) SetAttendanceStatus(ctx context.Context, arg SetAttendanceStat
 		&i.Status,
 		&i.CreatedAt,
 		&i.UpdatedAt,
+		&i.BreakStartedAt,
 	)
 	return i, err
 }

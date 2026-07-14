@@ -19,16 +19,19 @@ UPDATE attendance_records SET
     check_out_lng       = $3,
     check_out_photo_url = $4,
     status              = 'checked_out',
+    break_started_at    = NULL,
     updated_at          = now()
 WHERE client_id = $1
 RETURNING *;
 
 -- name: SetAttendanceStatus :one
 -- Toggle break state for an open record. Only moves between checked_in and
--- on_break (a checked-out/missed record is left unchanged).
+-- on_break (a checked-out/missed record is left unchanged). break_started_at
+-- tracks the current break: stamped on entry, cleared on resume.
 UPDATE attendance_records SET
-    status     = sqlc.arg('status'),
-    updated_at = now()
+    status           = sqlc.arg('status'),
+    break_started_at = CASE WHEN sqlc.arg('status') = 'on_break' THEN now() END,
+    updated_at       = now()
 WHERE client_id = sqlc.arg('client_id')
   AND status IN ('checked_in', 'on_break')
 RETURNING *;

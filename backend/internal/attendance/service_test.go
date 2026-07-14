@@ -40,6 +40,7 @@ func (f *fakeRepo) CheckOut(_ context.Context, in CheckOutInput) (Record, error)
 	now := time.Now()
 	r.CheckOutAt = &now
 	r.Status = "checked_out"
+	r.BreakStartedAt = nil // mirrors the SQL: checkout ends any open break
 	f.byClient[in.ClientID] = r
 	return r, nil
 }
@@ -49,6 +50,14 @@ func (f *fakeRepo) SetStatus(_ context.Context, clientID uuid.UUID, status strin
 		return Record{}, ErrNotFound
 	}
 	r.Status = status
+	// Mirror the SQL: stamp break_started_at on entering a break, clear it on
+	// any other transition.
+	if status == "on_break" {
+		now := time.Now()
+		r.BreakStartedAt = &now
+	} else {
+		r.BreakStartedAt = nil
+	}
 	f.byClient[clientID] = r
 	return r, nil
 }
@@ -279,13 +288,23 @@ func TestSetBreakTogglesStatus(t *testing.T) {
 	if err != nil || r.Status != "on_break" {
 		t.Fatalf("start break: status=%q err=%v", r.Status, err)
 	}
-	// idempotent on the same target
-	if r2, err := svc.SetBreak(ctx, user, cid, true); err != nil || r2.Status != "on_break" {
+	if r.BreakStartedAt == nil {
+		t.Error("start break: break_started_at not set")
+	}
+	// idempotent on the same target — must not restart the break clock
+	r2, err := svc.SetBreak(ctx, user, cid, true)
+	if err != nil || r2.Status != "on_break" {
 		t.Fatalf("re-break: status=%q err=%v", r2.Status, err)
+	}
+	if r2.BreakStartedAt == nil || !r2.BreakStartedAt.Equal(*r.BreakStartedAt) {
+		t.Errorf("re-break moved break_started_at: %v vs %v", r2.BreakStartedAt, r.BreakStartedAt)
 	}
 	r3, err := svc.SetBreak(ctx, user, cid, false)
 	if err != nil || r3.Status != "checked_in" {
 		t.Fatalf("resume: status=%q err=%v", r3.Status, err)
+	}
+	if r3.BreakStartedAt != nil {
+		t.Errorf("resume: break_started_at not cleared: %v", r3.BreakStartedAt)
 	}
 	// unknown client_id
 	if _, err := svc.SetBreak(ctx, user, uuid.New(), true); !errors.Is(err, ErrNotFound) {

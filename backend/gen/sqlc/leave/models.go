@@ -27,6 +27,7 @@ type AttendanceRecord struct {
 	Status           string
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
+	BreakStartedAt   pgtype.Timestamptz
 }
 
 type Department struct {

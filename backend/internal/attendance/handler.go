@@ -138,6 +138,7 @@ func toRecord(r Record) oapi.AttendanceRecord {
 		CheckOutLat:      r.CheckOutLat,
 		CheckOutLng:      r.CheckOutLng,
 		CheckOutPhotoUrl: r.CheckOutPhotoURL,
+		BreakStartedAt:   r.BreakStartedAt,
 		Status:           oapi.AttendanceRecordStatus(r.Status),
 		CreatedAt:        r.CreatedAt,
 		UpdatedAt:        r.UpdatedAt,

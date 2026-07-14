@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { LeaveRequest, LiveViewEntry } from "../api/resources";
+import type { Department, Employee, LeaveRequest, LiveViewEntry, Tour } from "../api/resources";
 import {
   Avatar,
   Btn,
@@ -45,6 +45,80 @@ const STATUS_ORDER: Record<LiveStatus, number> = {
 };
 
 type Layout = "timeline" | "list" | "map";
+
+type GroupBy = "none" | "status" | "tour" | "department";
+
+// Ordered sections for the timeline/list. label === null means "no headers"
+// (the ungrouped case).
+type Group = { key: string; label: string | null; rows: Row[] };
+
+function buildGroups(
+  rows: Row[],
+  groupBy: GroupBy,
+  lookups: {
+    tourNames: Map<string, string>;
+    employeeDepartment: Map<string, string | null | undefined>;
+    departmentNames: Map<string, string>;
+  },
+): Group[] {
+  if (groupBy === "none") {
+    return [{ key: "all", label: null, rows }];
+  }
+  if (groupBy === "status") {
+    return (Object.keys(STATUS_ORDER) as LiveStatus[])
+      .sort((a, b) => STATUS_ORDER[a] - STATUS_ORDER[b])
+      .map((st) => ({ key: st, label: STATUS[st].label, rows: rows.filter((r) => r._status === st) }))
+      .filter((g) => g.rows.length > 0);
+  }
+  const FALLBACK = groupBy === "tour" ? "No tour" : "No department";
+  const labelOf = (r: Row): string => {
+    if (groupBy === "tour") {
+      return (r.shift.tour_id && lookups.tourNames.get(r.shift.tour_id)) || FALLBACK;
+    }
+    const depId = lookups.employeeDepartment.get(r.employee_id);
+    return (depId && lookups.departmentNames.get(depId)) || FALLBACK;
+  };
+  const byLabel = new Map<string, Row[]>();
+  for (const r of rows) {
+    const label = labelOf(r);
+    byLabel.set(label, [...(byLabel.get(label) ?? []), r]);
+  }
+  return [...byLabel.entries()]
+    .sort(([a], [b]) => (a === FALLBACK ? 1 : b === FALLBACK ? -1 : a.localeCompare(b)))
+    .map(([label, groupRows]) => ({ key: label, label, rows: groupRows }));
+}
+
+function GroupHeader({ label, count }: { label: string; count: number }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 8,
+        padding: "10px 2px 6px",
+        fontSize: 11.5,
+        fontWeight: 700,
+        letterSpacing: "0.07em",
+        textTransform: "uppercase",
+        color: "var(--adaptive-500)",
+      }}
+    >
+      {label}
+      <span
+        style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: "var(--adaptive-400)",
+          background: "var(--adaptive-100)",
+          borderRadius: 9999,
+          padding: "0 7px",
+        }}
+      >
+        {count}
+      </span>
+    </div>
+  );
+}
 
 function Seg({
   value,
@@ -223,6 +297,14 @@ function floorToLocalHour(ms: number): number {
   return d.getTime();
 }
 
+function isLocalMidnight(ms: number): boolean {
+  const d = new Date(ms);
+  return d.getHours() === 0 && d.getMinutes() === 0;
+}
+
+// Day-break label shown on the axis where a new day starts, e.g. "Wed 15".
+const dayFmt = new Intl.DateTimeFormat(undefined, { weekday: "short", day: "numeric" });
+
 // Per-status one-liner under the employee name.
 function railMeta(r: Row, nowMs: number): string {
   switch (r._status) {
@@ -230,8 +312,12 @@ function railMeta(r: Row, nowMs: number): string {
       const mins = r.check_in_at ? minutesBetween(r.check_in_at, new Date(nowMs).toISOString()) : null;
       return mins != null ? `On shift ${fmtDur(mins)}` : "On shift";
     }
-    case "break":
-      return "On break";
+    case "break": {
+      const mins = r.break_started_at
+        ? minutesBetween(r.break_started_at, new Date(nowMs).toISOString())
+        : null;
+      return mins != null && mins >= 0 ? `On break ${fmtDur(mins)}` : "On break";
+    }
     case "late":
       return "Not checked in";
     case "done":
@@ -244,16 +330,17 @@ function railMeta(r: Row, nowMs: number): string {
 }
 
 function Timeline({
-  rows,
+  groups,
   nowMs,
   locationName,
   onSelect,
 }: {
-  rows: Row[];
+  groups: Group[];
   nowMs: number;
   locationName: (id?: string | null) => string;
   onSelect: (r: Row) => void;
 }) {
+  const rows = groups.flatMap((g) => g.rows);
   if (rows.length === 0) {
     return (
       <Card style={{ padding: "40px 24px", textAlign: "center", color: "var(--adaptive-500)", fontSize: 13 }}>
@@ -262,50 +349,51 @@ function Timeline({
     );
   }
 
-  // Axis window: fit today's shifts (plus "now") with an hour of margin,
-  // rounded to whole local hours, capped at MAX_AXIS_MS.
+  // Axis window: auto-fit today's shifts (plus "now") with an hour of margin,
+  // capped at MAX_AXIS_MS, then snapped outward to tick boundaries anchored at
+  // local midnight so labels land on familiar clock times. Where the window
+  // crosses midnight, the tick becomes a day-break marker with the date.
   const startTimes = rows.map((r) => new Date(r.shift.starts_at).getTime());
   const endTimes = rows.map((r) => new Date(r.shift.ends_at).getTime());
-  const axisStart = floorToLocalHour(Math.min(...startTimes, nowMs) - HOUR_MS);
+  let axisStart = floorToLocalHour(Math.min(...startTimes, nowMs) - HOUR_MS);
   let axisEnd = floorToLocalHour(Math.max(...endTimes, nowMs)) + HOUR_MS;
   if (axisEnd - axisStart > MAX_AXIS_MS) {
     axisEnd = axisStart + MAX_AXIS_MS;
   }
+  const stepH = [1, 2, 4, 6].find((s) => (axisEnd - axisStart) / HOUR_MS / s <= 8) ?? 6;
+  const stepMs = stepH * HOUR_MS;
+  const anchor = new Date(axisStart);
+  anchor.setHours(0, 0, 0, 0);
+  axisStart = anchor.getTime() + Math.floor((axisStart - anchor.getTime()) / stepMs) * stepMs;
+  axisEnd = axisStart + Math.ceil((axisEnd - axisStart) / stepMs) * stepMs;
+
   const span = axisEnd - axisStart;
   const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - axisStart) / span) * 100));
-
-  // Hour ticks: pick a step that yields at most ~8 labels (4h blocks for a
-  // full-day span; never 3h).
-  const spanHours = span / HOUR_MS;
-  const stepH = [1, 2, 4, 6].find((s) => spanHours / s <= 8) ?? 6;
   const ticks: number[] = [];
-  for (let t = axisStart; t <= axisEnd; t += stepH * HOUR_MS) {
+  for (let t = axisStart; t <= axisEnd; t += stepMs) {
     ticks.push(t);
   }
 
   const nowPct = pct(nowMs);
-  const sorted = [...rows].sort(
-    (a, b) =>
-      STATUS_ORDER[a._status] - STATUS_ORDER[b._status] ||
-      new Date(a.shift.starts_at).getTime() - new Date(b.shift.starts_at).getTime() ||
-      a.employee_name.localeCompare(b.employee_name),
-  );
 
   const gridLines = (
     <>
-      {ticks.map((t) => (
-        <span
-          key={t}
-          style={{
-            position: "absolute",
-            left: `${pct(t)}%`,
-            top: 0,
-            bottom: 0,
-            width: 1,
-            background: "var(--adaptive-100)",
-          }}
-        />
-      ))}
+      {ticks.map((t) => {
+        const dayBreak = isLocalMidnight(t);
+        return (
+          <span
+            key={t}
+            style={{
+              position: "absolute",
+              left: `${pct(t)}%`,
+              top: 0,
+              bottom: 0,
+              width: dayBreak ? 2 : 1,
+              background: dayBreak ? "var(--adaptive-300)" : "var(--adaptive-100)",
+            }}
+          />
+        );
+      })}
       <span
         style={{
           position: "absolute",
@@ -333,24 +421,29 @@ function Timeline({
         >
           <div />
           <div style={{ position: "relative", height: 30 }}>
-            {/* hide hour labels the NOW pill would collide with */}
-            {ticks.filter((t) => Math.abs(pct(t) - nowPct) > 5).map((t) => (
-              <span
-                key={t}
-                style={{
-                  position: "absolute",
-                  left: `${pct(t)}%`,
-                  bottom: 5,
-                  transform: "translateX(-50%)",
-                  fontSize: 10.5,
-                  color: "var(--adaptive-400)",
-                  fontFeatureSettings: "'tnum'",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {formatTime(new Date(t).toISOString())}
-              </span>
-            ))}
+            {/* hide hour labels the NOW pill would collide with; a midnight
+                tick shows the new day's date instead of a time */}
+            {ticks.filter((t) => Math.abs(pct(t) - nowPct) > 5).map((t) => {
+              const dayBreak = isLocalMidnight(t);
+              return (
+                <span
+                  key={t}
+                  style={{
+                    position: "absolute",
+                    left: `${pct(t)}%`,
+                    bottom: 5,
+                    transform: "translateX(-50%)",
+                    fontSize: 10.5,
+                    fontWeight: dayBreak ? 700 : 400,
+                    color: dayBreak ? "var(--adaptive-600)" : "var(--adaptive-400)",
+                    fontFeatureSettings: "'tnum'",
+                    whiteSpace: "nowrap",
+                  }}
+                >
+                  {dayBreak ? dayFmt.format(t) : formatTime(new Date(t).toISOString())}
+                </span>
+              );
+            })}
             <span
               style={{
                 position: "absolute",
@@ -372,16 +465,27 @@ function Timeline({
         </div>
 
         {/* rows */}
-        {sorted.map((r, i) => {
+        {groups.map((g, gi) => (
+          <div key={g.key}>
+            {g.label != null && <GroupHeader label={g.label} count={g.rows.length} />}
+            {g.rows.map((r, i) => {
           const s = STATUS[r._status];
           const shiftStart = new Date(r.shift.starts_at).getTime();
           const shiftEnd = new Date(r.shift.ends_at).getTime();
           const clipped = shiftEnd > axisEnd;
+          const clippedStart = shiftStart < axisStart;
           const schedLeft = pct(shiftStart);
           const schedWidth = Math.max(pct(shiftEnd) - schedLeft, 0.5);
           const inMs = r.check_in_at ? new Date(r.check_in_at).getTime() : null;
           const outMs = r.check_out_at ? new Date(r.check_out_at).getTime() : null;
           const actualEnd = outMs ?? nowMs;
+          // Current break: solid fill stops where the break began; the break
+          // itself renders hatched up to now.
+          const breakMs =
+            r._status === "break" && r.break_started_at
+              ? new Date(r.break_started_at).getTime()
+              : null;
+          const solidEnd = breakMs != null && breakMs > (inMs ?? 0) ? breakMs : actualEnd;
           return (
             <div
               key={r.shift.id}
@@ -389,7 +493,10 @@ function Timeline({
               style={{
                 display: "grid",
                 gridTemplateColumns: `${RAIL_W}px 1fr`,
-                borderBottom: i < sorted.length - 1 ? "1px solid var(--adaptive-100)" : "none",
+                borderBottom:
+                  gi < groups.length - 1 || i < g.rows.length - 1
+                    ? "1px solid var(--adaptive-100)"
+                    : "none",
                 cursor: "pointer",
                 opacity: r._status === "upcoming" ? 0.6 : 1,
               }}
@@ -443,17 +550,34 @@ function Timeline({
                     boxSizing: "border-box",
                   }}
                 />
-                {/* actual worked segment */}
-                {inMs != null && actualEnd > inMs && (
+                {/* actual worked segment (up to the current break, if any) */}
+                {inMs != null && solidEnd > inMs && (
                   <span
                     style={{
                       position: "absolute",
                       top: 10,
                       height: 26,
                       left: `${pct(inMs)}%`,
-                      width: `${Math.max(pct(actualEnd) - pct(inMs), 0.4)}%`,
+                      width: `${Math.max(pct(solidEnd) - pct(inMs), 0.4)}%`,
                       background: s.dot,
                       opacity: 0.75,
+                      borderRadius: 6,
+                    }}
+                  />
+                )}
+                {/* current break: hatched from break start to now */}
+                {breakMs != null && actualEnd > breakMs && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      height: 26,
+                      left: `${pct(breakMs)}%`,
+                      width: `${Math.max(pct(actualEnd) - pct(breakMs), 0.4)}%`,
+                      background: `repeating-linear-gradient(-45deg, ${s.dot} 0 4px, transparent 4px 8px)`,
+                      border: `1.5px solid ${s.dot}`,
+                      boxSizing: "border-box",
+                      opacity: 0.85,
                       borderRadius: 6,
                     }}
                   />
@@ -485,22 +609,37 @@ function Timeline({
                     →
                   </span>
                 )}
+                {clippedStart && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 15,
+                      left: 2,
+                      fontSize: 12,
+                      color: "var(--adaptive-400)",
+                    }}
+                  >
+                    ←
+                  </span>
+                )}
               </div>
             </div>
           );
-        })}
+            })}
+          </div>
+        ))}
       </div>
     </Card>
   );
 }
 
 function ListView({
-  rows,
+  groups,
   nowMs,
   locationName,
   onSelect,
 }: {
-  rows: Row[];
+  groups: Group[];
   nowMs: number;
   locationName: (id?: string | null) => string;
   onSelect: (r: Row) => void;
@@ -529,7 +668,16 @@ function ListView({
             </tr>
           </thead>
           <tbody>
-            {rows.map((r, i) => {
+            {groups.flatMap((g, gi) => {
+              const headerRow =
+                g.label != null ? (
+                  <tr key={`h-${g.key}`}>
+                    <td colSpan={6} style={{ padding: "0 16px", background: "var(--adaptive-50)" }}>
+                      <GroupHeader label={g.label} count={g.rows.length} />
+                    </td>
+                  </tr>
+                ) : null;
+              const rowEls = g.rows.map((r, i) => {
               const onShiftMins = r.check_in_at
                 ? minutesBetween(r.check_in_at, new Date(nowMs).toISOString())
                 : null;
@@ -539,7 +687,10 @@ function ListView({
                   onClick={() => onSelect(r)}
                   style={{
                     cursor: "pointer",
-                    borderBottom: i < rows.length - 1 ? "1px solid var(--adaptive-100)" : "none",
+                    borderBottom:
+                      gi < groups.length - 1 || i < g.rows.length - 1
+                        ? "1px solid var(--adaptive-100)"
+                        : "none",
                   }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = "var(--adaptive-50)")}
                   onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
@@ -569,6 +720,8 @@ function ListView({
                   </td>
                 </tr>
               );
+              });
+              return headerRow ? [headerRow, ...rowEls] : rowEls;
             })}
           </tbody>
         </table>
@@ -847,26 +1000,44 @@ export function LiveView({
   entries,
   leaveRequests,
   locationNames,
+  employees,
+  departments,
+  tours,
   onRefresh,
   loading,
 }: {
   entries: LiveViewEntry[];
   leaveRequests: LeaveRequest[];
   locationNames: Map<string, string>;
+  employees: Employee[];
+  departments: Department[];
+  tours: Tour[];
   onRefresh: () => void;
   loading: boolean;
 }) {
   const [layout, setLayout] = useState<Layout>("timeline");
   const [filter, setFilter] = useState<LiveStatus | null>(null);
+  const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [sel, setSel] = useState<Row | null>(null);
   const nowMs = Date.now();
   const today = new Date();
 
   const rows: Row[] = entries.map((e) => ({ ...e, _status: deriveStatus(e, nowMs) }));
   const count = (st: LiveStatus) => rows.filter((r) => r._status === st).length;
-  const shown = filter ? rows.filter((r) => r._status === filter) : rows;
+  const shown = (filter ? rows.filter((r) => r._status === filter) : rows).sort(
+    (a, b) =>
+      STATUS_ORDER[a._status] - STATUS_ORDER[b._status] ||
+      new Date(a.shift.starts_at).getTime() - new Date(b.shift.starts_at).getTime() ||
+      a.employee_name.localeCompare(b.employee_name),
+  );
   const locationName = (id?: string | null) => (id ? locationNames.get(id) ?? "Unknown" : "Unassigned");
   const lateRows = rows.filter((r) => r._status === "late");
+
+  const groups = buildGroups(shown, groupBy, {
+    tourNames: new Map(tours.map((t) => [t.id, t.name])),
+    employeeDepartment: new Map(employees.map((e) => [e.id, e.department_id])),
+    departmentNames: new Map(departments.map((d) => [d.id, d.name])),
+  });
 
   // On leave today: distinct employees with an approved request covering today.
   const onLeaveCount = (() => {
@@ -926,10 +1097,31 @@ export function LiveView({
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <label style={{ display: "inline-flex", alignItems: "center", gap: 7, fontSize: 12.5, color: "var(--adaptive-500)", fontWeight: 500 }}>
+            Group by
+            <select
+              value={groupBy}
+              onChange={(e) => setGroupBy(e.target.value as GroupBy)}
+              style={{
+                fontFamily: "inherit",
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "var(--adaptive-800)",
+                background: "var(--card)",
+                border: "1px solid var(--adaptive-200)",
+                borderRadius: 7,
+                padding: "6px 8px",
+                cursor: "pointer",
+              }}
+            >
+              <option value="none">None</option>
+              <option value="status">Status</option>
+              <option value="tour">Tour</option>
+              <option value="department">Department</option>
+            </select>
+          </label>
           <Seg value={layout} onChange={setLayout} />
-          <Btn variant="secondary" icon="refresh" onClick={onRefresh} disabled={loading}>
-            {loading ? "Refreshing" : "Refresh"}
-          </Btn>
+          <Btn variant="secondary" icon="refresh" title="Refresh" onClick={onRefresh} disabled={loading} />
         </div>
       </div>
 
@@ -968,11 +1160,11 @@ export function LiveView({
             <AttentionBanner rows={lateRows} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
           )}
           {layout === "timeline" ? (
-            <Timeline rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+            <Timeline groups={groups} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
           ) : layout === "map" ? (
             <MapView rows={shown} locationName={locationName} onSelect={setSel} />
           ) : (
-            <ListView rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+            <ListView groups={groups} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
           )}
         </>
       )}

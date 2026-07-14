@@ -1328,6 +1328,11 @@ export interface components {
             /** Format: double */
             check_out_lng?: number | null;
             check_out_photo_url?: string | null;
+            /**
+             * Format: date-time
+             * @description When the current break began. Set while status is on_break; null once the break ends (resume or check-out).
+             */
+            break_started_at?: string | null;
             /** @enum {string} */
             status: "checked_in" | "checked_out" | "missed" | "on_break";
             /** Format: date-time */
@@ -1388,6 +1393,11 @@ export interface components {
             check_in_lat?: number | null;
             /** Format: double */
             check_in_lng?: number | null;
+            /**
+             * Format: date-time
+             * @description When the current break began; only set while attendance_status is on_break.
+             */
+            break_started_at?: string | null;
         };
         /**
          * @description Kind of leave being requested.
