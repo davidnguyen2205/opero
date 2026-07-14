@@ -23,7 +23,7 @@ import {
   type Shift,
   type Tour,
 } from "./api/resources";
-import { Icon, humanize, initials } from "./ui";
+import { Icon, OperoMark, humanize, initials } from "./ui";
 import type { IconName } from "./ui";
 import { AuthScreen } from "./views/Auth";
 import { LiveView } from "./views/LiveView";
@@ -84,38 +84,6 @@ function describeError(err: unknown, fallback: string): string {
     return err.message;
   }
   return fallback;
-}
-
-function OperoMark({ size = 28 }: { size?: number }) {
-  return (
-    <div
-      style={{
-        width: size,
-        height: size,
-        borderRadius: 7,
-        flexShrink: 0,
-        background: "linear-gradient(180deg, var(--primary-500), var(--primary-600))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
-      }}
-    >
-      <svg
-        width={size * 0.58}
-        height={size * 0.58}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      >
-        <circle cx="12" cy="12" r="7.5" />
-        <circle cx="12" cy="12" r="1.6" fill="#fff" />
-      </svg>
-    </div>
-  );
 }
 
 function Sidebar({

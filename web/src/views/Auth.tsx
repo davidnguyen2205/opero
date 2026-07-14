@@ -1,39 +1,111 @@
 import { useState } from "react";
-import type { CSSProperties } from "react";
+import type { ReactNode } from "react";
 import { authApi } from "../api/resources";
 import type { AuthResponse } from "../api/resources";
-import { Btn, Field, Icon, controlStyle } from "../ui";
+import { useTypewriter } from "../hooks/useTypewriter";
+import { Btn, Icon, OperoMark, controlStyle } from "../ui";
+import type { IconName } from "../ui";
 
 type Mode = "login" | "signup";
 
-function OperoMark({ size = 34 }: { size?: number }) {
+// Rotating sign-in headlines (pattern ported from the Blazeup Super Admin
+// login: type each phrase out, hold it, then start the next at random).
+const SIGN_IN_TITLES = [
+  "Welcome to Opero!",
+  "Have a nice day!",
+  "Let's get to work",
+  "Ready when you are",
+  "Make today count",
+  "Your crew is waiting",
+];
+
+const REDUCED_MOTION =
+  typeof window !== "undefined" &&
+  window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+
+// Each character is its own span that mounts once and fades in, so the fade
+// always plays to completion instead of snapping when the next char arrives.
+// The leading character is tinted primary while typing and eases back to the
+// title color once the phrase settles. The caret is solid while typing and
+// blinks when the phrase is held.
+function TypewriterTitle() {
+  const { text, phase } = useTypewriter(SIGN_IN_TITLES, {
+    typingSpeed: 50,
+    pauseDuration: 3000,
+  });
+  if (REDUCED_MOTION) {
+    return <>{SIGN_IN_TITLES[0]}</>;
+  }
+  const isTyping = phase === "typing";
+  const lastIndex = text.length - 1;
   return (
-    <div
+    <>
+      {text.split("").map((char, i) => (
+        <span
+          key={i}
+          className="opero-char-in"
+          style={isTyping && i === lastIndex ? { color: "var(--primary-600)" } : undefined}
+        >
+          {char}
+        </span>
+      ))}
+      <span
+        aria-hidden="true"
+        className={isTyping ? "" : "opero-caret-blink"}
+        style={{
+          marginLeft: 4,
+          display: "inline-block",
+          width: 2,
+          height: "0.8em",
+          transform: "translateY(0.12em)",
+          background: "var(--primary-300)",
+        }}
+      />
+    </>
+  );
+}
+
+// Label with the reference's required-asterisk treatment.
+function FieldLabel({ children, required }: { children: ReactNode; required?: boolean }) {
+  return (
+    <label
       style={{
-        width: size,
-        height: size,
-        borderRadius: 9,
-        flexShrink: 0,
-        background: "linear-gradient(180deg, var(--primary-500), var(--primary-600))",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        boxShadow: "inset 0 1px 0 rgba(255,255,255,0.25)",
+        display: "block",
+        fontSize: 13,
+        fontWeight: 600,
+        color: "var(--adaptive-800)",
+        marginBottom: 6,
       }}
     >
-      <svg
-        width={size * 0.58}
-        height={size * 0.58}
-        viewBox="0 0 24 24"
-        fill="none"
-        stroke="#fff"
-        strokeWidth="2.4"
-        strokeLinecap="round"
-        strokeLinejoin="round"
+      {children}
+      {required && <span style={{ color: "var(--red-500)", marginLeft: 3 }}>*</span>}
+    </label>
+  );
+}
+
+// Input with a leading icon, like the reference's email field.
+function IconInput({
+  icon,
+  ...rest
+}: { icon: IconName } & React.InputHTMLAttributes<HTMLInputElement>) {
+  return (
+    <div style={{ position: "relative" }}>
+      <span
+        style={{
+          position: "absolute",
+          left: 13,
+          top: "50%",
+          transform: "translateY(-50%)",
+          display: "flex",
+          pointerEvents: "none",
+        }}
       >
-        <circle cx="12" cy="12" r="7.5" />
-        <circle cx="12" cy="12" r="1.6" fill="#fff" />
-      </svg>
+        <Icon name={icon} size={16} color="var(--adaptive-400)" />
+      </span>
+      <input
+        {...rest}
+        style={{ ...controlStyle, width: "100%", boxSizing: "border-box", paddingLeft: 38, minHeight: 42 }}
+      />
     </div>
   );
 }
@@ -73,63 +145,72 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (auth: AuthRe
     }
   }
 
-  const tab = (m: Mode): CSSProperties => ({
-    flex: 1,
-    minHeight: 36,
-    padding: "0 14px",
-    borderRadius: 6,
-    border: 0,
-    cursor: "pointer",
-    fontFamily: "inherit",
-    fontWeight: 600,
-    fontSize: 13,
-    color: mode === m ? "var(--primary-700)" : "var(--adaptive-600)",
-    background: mode === m ? "var(--card)" : "transparent",
-    boxShadow: mode === m ? "var(--shadow-xs)" : "none",
-  });
+  function switchMode(m: Mode) {
+    setMode(m);
+    setError(null);
+  }
 
   return (
-    <div style={{ display: "grid", minHeight: "100vh", gridTemplateColumns: "minmax(320px, 460px) 1fr", background: "var(--background)" }}>
-      <section
+    <div
+      style={{
+        minHeight: "100vh",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        // Warm cream page ground, same value as the Blazeup login layout.
+        background: "#fefbf6",
+        padding: "24px 20px",
+      }}
+    >
+      <main
         style={{
+          flex: 1,
           display: "flex",
           flexDirection: "column",
           justifyContent: "center",
-          gap: 22,
-          padding: "48px clamp(28px, 5vw, 56px)",
-          borderRight: "1px solid var(--adaptive-200)",
-          background: "var(--card)",
+          width: "100%",
+          maxWidth: 432,
         }}
       >
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <OperoMark />
-          <div>
-            <div style={{ fontSize: 22, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--adaptive-900)" }}>
-              Opero
-            </div>
-            <div style={{ fontSize: 13, color: "var(--adaptive-500)" }}>
-              Manager console for people, roster & field ops
-            </div>
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: 12, marginBottom: 26 }}>
+          <OperoMark size={40} />
+          <span style={{ fontSize: 24, fontWeight: 700, letterSpacing: "-0.02em", color: "var(--adaptive-900)" }}>
+            opero
+          </span>
+          <span
+            style={{
+              border: "1px solid var(--primary-300)",
+              color: "var(--primary-600)",
+              background: "var(--primary-50)",
+              borderRadius: 9999,
+              padding: "3px 11px",
+              fontSize: 11,
+              fontWeight: 700,
+              letterSpacing: "0.06em",
+            }}
+          >
+            MANAGER CONSOLE
+          </span>
         </div>
 
-        <div
+        <h1
           style={{
-            display: "flex",
-            gap: 4,
-            padding: 4,
-            border: "1px solid var(--adaptive-200)",
-            borderRadius: 8,
-            background: "var(--adaptive-100)",
+            margin: "0 0 8px",
+            fontSize: 30,
+            fontWeight: 800,
+            letterSpacing: "-0.02em",
+            color: "var(--adaptive-900)",
+            minHeight: "1.15em",
+            whiteSpace: "nowrap",
           }}
         >
-          <button onClick={() => setMode("login")} style={tab("login")}>
-            Log in
-          </button>
-          <button onClick={() => setMode("signup")} style={tab("signup")}>
-            Sign up
-          </button>
-        </div>
+          {mode === "login" ? <TypewriterTitle /> : "Create your workspace"}
+        </h1>
+        <p style={{ margin: "0 0 26px", fontSize: 15, color: "var(--adaptive-600)" }}>
+          {mode === "login"
+            ? "Sign in to run your roster and field operations."
+            : "Set up a company workspace and its first admin account."}
+        </p>
 
         {error && (
           <div
@@ -140,85 +221,164 @@ export function AuthScreen({ onAuthenticated }: { onAuthenticated: (auth: AuthRe
               borderRadius: 8,
               padding: "11px 14px",
               fontSize: 13.5,
+              marginBottom: 18,
             }}
           >
             {error}
           </div>
         )}
 
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void submit();
+          }}
+          style={{ display: "flex", flexDirection: "column", gap: 16 }}
+        >
           {mode === "login" ? (
             <>
-              <Field label="Tenant slug">
-                <input value={tenantSlug} onChange={(e) => setTenantSlug(e.target.value)} style={controlStyle} autoComplete="organization" />
-              </Field>
-              <Field label="Email">
-                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} style={controlStyle} autoComplete="email" />
-              </Field>
-              <Field label="Password">
-                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} style={controlStyle} autoComplete="current-password" />
-              </Field>
+              <div>
+                <FieldLabel required>Workspace</FieldLabel>
+                <IconInput
+                  icon="briefcase"
+                  value={tenantSlug}
+                  onChange={(e) => setTenantSlug(e.target.value)}
+                  placeholder="your-company-slug"
+                  autoComplete="organization"
+                  required
+                />
+              </div>
+              <div>
+                <FieldLabel required>Email address</FieldLabel>
+                <IconInput
+                  icon="mail"
+                  type="email"
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
+                  placeholder="Enter your email"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div>
+                <FieldLabel required>Password</FieldLabel>
+                <IconInput
+                  icon="lock"
+                  type="password"
+                  value={password}
+                  onChange={(e) => setPassword(e.target.value)}
+                  placeholder="Enter your password"
+                  autoComplete="current-password"
+                  required
+                />
+              </div>
             </>
           ) : (
             <>
-              <Field label="Company name">
-                <input value={companyName} onChange={(e) => setCompanyName(e.target.value)} style={controlStyle} />
-              </Field>
-              <Field label="Tenant slug (optional)">
-                <input value={slug} onChange={(e) => setSlug(e.target.value)} style={controlStyle} pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$" />
-              </Field>
-              <Field label="Admin full name">
-                <input value={adminName} onChange={(e) => setAdminName(e.target.value)} style={controlStyle} />
-              </Field>
-              <Field label="Admin email">
-                <input type="email" value={adminEmail} onChange={(e) => setAdminEmail(e.target.value)} style={controlStyle} autoComplete="email" />
-              </Field>
-              <Field label="Admin password">
-                <input type="password" value={adminPassword} onChange={(e) => setAdminPassword(e.target.value)} style={controlStyle} autoComplete="new-password" minLength={8} />
-              </Field>
+              <div>
+                <FieldLabel required>Company name</FieldLabel>
+                <IconInput
+                  icon="briefcase"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Saigon Tours Co."
+                  required
+                />
+              </div>
+              <div>
+                <FieldLabel>Workspace slug</FieldLabel>
+                <IconInput
+                  icon="route"
+                  value={slug}
+                  onChange={(e) => setSlug(e.target.value)}
+                  placeholder="saigon-tours (optional)"
+                  pattern="^[a-z0-9]+(?:-[a-z0-9]+)*$"
+                />
+              </div>
+              <div>
+                <FieldLabel>Admin full name</FieldLabel>
+                <IconInput
+                  icon="users"
+                  value={adminName}
+                  onChange={(e) => setAdminName(e.target.value)}
+                  placeholder="Your name (optional)"
+                />
+              </div>
+              <div>
+                <FieldLabel required>Admin email</FieldLabel>
+                <IconInput
+                  icon="mail"
+                  type="email"
+                  value={adminEmail}
+                  onChange={(e) => setAdminEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  autoComplete="email"
+                  required
+                />
+              </div>
+              <div>
+                <FieldLabel required>Admin password</FieldLabel>
+                <IconInput
+                  icon="lock"
+                  type="password"
+                  value={adminPassword}
+                  onChange={(e) => setAdminPassword(e.target.value)}
+                  placeholder="At least 8 characters"
+                  autoComplete="new-password"
+                  minLength={8}
+                  required
+                />
+              </div>
             </>
           )}
-          <Btn variant="primary" size="lg" disabled={submitting} onClick={() => void submit()}>
-            {submitting ? "Working…" : mode === "login" ? "Log in" : "Create tenant"}
-          </Btn>
-        </div>
-      </section>
 
-      <section
-        style={{
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-end",
-          gap: 18,
-          padding: "clamp(32px, 5vw, 64px)",
-          color: "#fff",
-          background:
-            "linear-gradient(160deg, var(--primary-700), var(--adaptive-950))",
-        }}
-      >
-        <div
-          style={{
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 8,
-            alignSelf: "flex-start",
-            padding: "6px 12px",
-            borderRadius: 9999,
-            background: "rgba(255,255,255,0.12)",
-            fontSize: 12.5,
-            fontWeight: 600,
-          }}
-        >
-          <Icon name="activity" size={15} /> Real-time field operations
-        </div>
-        <h1 style={{ margin: 0, fontSize: "clamp(1.8rem, 4vw, 3rem)", lineHeight: 1.05, fontWeight: 700 }}>
-          Run the daily field-ops loop from one place.
-        </h1>
-        <p style={{ margin: 0, maxWidth: 560, fontSize: "1.05rem", color: "rgba(255,255,255,0.82)" }}>
-          Build the roster, maintain the people core, and publish assignments for guides, drivers,
-          operators, and office staff — then watch who's working in real time.
+          <Btn variant="primary" size="lg" type="submit" disabled={submitting} style={{ width: "100%" }}>
+            {submitting ? "Working…" : mode === "login" ? "Continue" : "Create workspace"}
+          </Btn>
+        </form>
+
+        <p style={{ margin: "20px 0 0", fontSize: 13.5, color: "var(--adaptive-600)", textAlign: "center" }}>
+          {mode === "login" ? (
+            <>
+              New to Opero?{" "}
+              <button onClick={() => switchMode("signup")} style={linkStyle}>
+                Create a workspace
+              </button>
+            </>
+          ) : (
+            <>
+              Already have a workspace?{" "}
+              <button onClick={() => switchMode("login")} style={linkStyle}>
+                Log in
+              </button>
+            </>
+          )}
         </p>
-      </section>
+      </main>
+
+      <footer style={{ textAlign: "center", paddingTop: 24 }}>
+        <div style={{ display: "flex", justifyContent: "center", gap: 18, fontSize: 13, marginBottom: 8 }}>
+          {["Help", "Privacy", "Terms"].map((l) => (
+            <a key={l} href="#" style={{ color: "var(--adaptive-600)", textDecoration: "none" }}>
+              {l}
+            </a>
+          ))}
+        </div>
+        <div style={{ fontSize: 12, color: "var(--adaptive-400)" }}>
+          Copyright © 2026 Opero. All rights reserved.
+        </div>
+      </footer>
     </div>
   );
 }
+
+const linkStyle = {
+  border: 0,
+  padding: 0,
+  background: "none",
+  color: "var(--primary-600)",
+  fontWeight: 600,
+  fontSize: 13.5,
+  fontFamily: "inherit",
+  cursor: "pointer",
+} as const;
