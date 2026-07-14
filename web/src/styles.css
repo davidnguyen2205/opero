@@ -169,6 +169,44 @@ textarea:focus {
   animation: opero-pulse 2s infinite;
 }
 
+/* Login headline typewriter (ported from the Blazeup Super Admin login). */
+@keyframes opero-char-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes opero-caret-blink {
+  0%,
+  50% {
+    opacity: 1;
+  }
+  50.01%,
+  100% {
+    opacity: 0;
+  }
+}
+
+.opero-char-in {
+  animation: opero-char-in 0.2s ease-out both;
+  transition: color 0.3s;
+}
+
+.opero-caret-blink {
+  animation: opero-caret-blink 1s step-end infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opero-char-in,
+  .opero-caret-blink,
+  .opero-pulse {
+    animation: none;
+  }
+}
+
 /* Empty roster cell — reveals a subtle fill on hover. */
 .opero-emptycell:hover {
   background: var(--adaptive-100) !important;

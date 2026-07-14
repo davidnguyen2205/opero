@@ -18,7 +18,7 @@ import {
 import type { LiveStatus } from "../ui";
 
 // The API exposes not_checked_in / checked_in / on_break / checked_out. We
-// derive the richer board statuses from that plus the shift's scheduled start.
+// derive the richer live statuses from that plus the shift's scheduled start.
 function deriveStatus(entry: LiveViewEntry, nowMs: number): LiveStatus {
   switch (entry.attendance_status) {
     case "checked_in":
@@ -34,7 +34,17 @@ function deriveStatus(entry: LiveViewEntry, nowMs: number): LiveStatus {
 
 type Row = LiveViewEntry & { _status: LiveStatus };
 
-type Layout = "board" | "list" | "map";
+// Urgency order for the timeline: what needs attention first.
+const STATUS_ORDER: Record<LiveStatus, number> = {
+  late: 0,
+  working: 1,
+  break: 2,
+  done: 3,
+  upcoming: 4,
+  off: 5,
+};
+
+type Layout = "timeline" | "list" | "map";
 
 function Seg({
   value,
@@ -43,8 +53,8 @@ function Seg({
   value: Layout;
   onChange: (v: Layout) => void;
 }) {
-  const options: { id: Layout; label: string; icon: "grid" | "list" | "map" }[] = [
-    { id: "board", label: "Board", icon: "grid" },
+  const options: { id: Layout; label: string; icon: "activity" | "list" | "map" }[] = [
+    { id: "timeline", label: "Timeline", icon: "activity" },
     { id: "list", label: "List", icon: "list" },
     { id: "map", label: "Map", icon: "map" },
   ];
@@ -90,7 +100,8 @@ function Seg({
   );
 }
 
-function KpiCard({
+// One pill per status: the count and the filter in a single element.
+function StatChip({
   label,
   value,
   dot,
@@ -99,164 +110,40 @@ function KpiCard({
 }: {
   label: string;
   value: number;
-  dot: string;
-  active: boolean;
-  onClick: () => void;
+  dot?: string;
+  active?: boolean;
+  onClick?: () => void;
 }) {
   return (
-    <Card
-      hover
+    <button
       onClick={onClick}
+      disabled={!onClick}
       style={{
-        flex: 1,
-        minWidth: 130,
-        padding: "12px 14px",
-        borderColor: active ? "var(--primary-300)" : "var(--adaptive-200)",
-        boxShadow: active ? "0 0 0 3px var(--primary-100)" : undefined,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        padding: "5px 13px",
+        borderRadius: 9999,
+        border: `1px solid ${active ? "var(--primary-300)" : "var(--adaptive-200)"}`,
+        background: "var(--card)",
+        boxShadow: active ? "0 0 0 3px var(--primary-100)" : "none",
+        cursor: onClick ? "pointer" : "default",
+        fontFamily: "inherit",
+        fontSize: 12.5,
+        color: "var(--adaptive-600)",
+        fontFeatureSettings: "'tnum'",
+        transition: "border-color .15s, box-shadow .15s",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-        <span style={{ width: 9, height: 9, borderRadius: "50%", background: dot }} />
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--adaptive-600)" }}>{label}</span>
-      </div>
-      <div
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-          color: "var(--adaptive-900)",
-          letterSpacing: "-0.02em",
-          fontFeatureSettings: "'tnum'",
-        }}
-      >
-        {value}
-      </div>
-    </Card>
+      {dot && <span style={{ width: 8, height: 8, borderRadius: "50%", background: dot }} />}
+      <span style={{ fontWeight: 700, color: "var(--adaptive-900)" }}>{value}</span>
+      {label}
+    </button>
   );
 }
 
-// Non-interactive KPI fed by approved leave covering today (not a board status,
-// so it isn't a clickable filter).
-function LeaveKpi({ value }: { value: number }) {
-  return (
-    <Card style={{ flex: 1, minWidth: 130, padding: "12px 14px", background: "var(--adaptive-50)" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 7, marginBottom: 8 }}>
-        <Icon name="sun" size={14} color="var(--adaptive-400)" />
-        <span style={{ fontSize: 12, fontWeight: 500, color: "var(--adaptive-600)" }}>On leave</span>
-      </div>
-      <div
-        style={{
-          fontSize: 26,
-          fontWeight: 700,
-          color: "var(--adaptive-900)",
-          letterSpacing: "-0.02em",
-          fontFeatureSettings: "'tnum'",
-        }}
-      >
-        {value}
-      </div>
-    </Card>
-  );
-}
-
-function WorkerCard({
-  row,
-  nowMs,
-  locationName,
-  onSelect,
-}: {
-  row: Row;
-  nowMs: number;
-  locationName: string;
-  onSelect: (r: Row) => void;
-}) {
-  const onShiftMins = row.check_in_at
-    ? minutesBetween(row.check_in_at, new Date(nowMs).toISOString())
-    : null;
-  return (
-    <Card hover onClick={() => onSelect(row)} style={{ padding: 13 }}>
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 10 }}>
-        <Avatar person={{ id: row.employee_id, name: row.employee_name }} size={38} />
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div
-            style={{
-              fontSize: 14,
-              fontWeight: 600,
-              color: "var(--adaptive-900)",
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
-            {row.employee_name}
-          </div>
-          <div style={{ fontSize: 12, color: "var(--adaptive-500)", fontFeatureSettings: "'tnum'" }}>
-            {formatTime(row.shift.starts_at)} – {formatTime(row.shift.ends_at)}
-          </div>
-        </div>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 6,
-          marginTop: 10,
-          color: "var(--adaptive-500)",
-          fontSize: 12,
-        }}
-      >
-        <Icon name="pin" size={14} color="var(--adaptive-400)" />
-        <span style={{ whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-          {locationName}
-        </span>
-      </div>
-
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          marginTop: 11,
-          paddingTop: 11,
-          borderTop: "1px solid var(--adaptive-100)",
-        }}
-      >
-        {row._status === "late" ? (
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--red-600)",
-              display: "flex",
-              alignItems: "center",
-              gap: 5,
-            }}
-          >
-            <Icon name="alert" size={14} color="var(--red-500)" /> Not checked in
-          </span>
-        ) : row._status === "upcoming" ? (
-          <span style={{ fontSize: 12, color: "var(--adaptive-500)", display: "flex", alignItems: "center", gap: 5 }}>
-            <Icon name="clock" size={14} color="var(--adaptive-400)" /> Starts {formatTime(row.shift.starts_at)}
-          </span>
-        ) : row._status === "done" ? (
-          <span style={{ fontSize: 12, color: "var(--adaptive-500)", display: "flex", alignItems: "center", gap: 5 }}>
-            <Icon name="check" size={14} color="var(--blue-500)" />{" "}
-            {row.check_in_at ? formatTime(row.check_in_at) : "—"}–
-            {row.check_out_at ? formatTime(row.check_out_at) : "—"}
-          </span>
-        ) : (
-          <span style={{ fontSize: 12, color: "var(--adaptive-600)", display: "flex", alignItems: "center", gap: 5 }}>
-            <Icon name="clock" size={14} color="var(--adaptive-400)" /> In{" "}
-            {row.check_in_at ? formatTime(row.check_in_at) : "—"}
-            {onShiftMins != null ? ` · ${fmtDur(onShiftMins)} on shift` : ""}
-          </span>
-        )}
-      </div>
-    </Card>
-  );
-}
-
-function Board({
+// Exceptions a manager must act on, pinned above the timeline.
+function AttentionBanner({
   rows,
   nowMs,
   locationName,
@@ -267,69 +154,343 @@ function Board({
   locationName: (id?: string | null) => string;
   onSelect: (r: Row) => void;
 }) {
-  const cols: { status: LiveStatus; label: string }[] = [
-    { status: "working", label: "On shift" },
-    { status: "break", label: "On break" },
-    { status: "late", label: "Not checked in" },
-    { status: "upcoming", label: "Upcoming today" },
-    { status: "done", label: "Checked out" },
-  ];
+  if (rows.length === 0) {
+    return null;
+  }
   return (
-    <div style={{ display: "flex", gap: 14, overflowX: "auto", paddingBottom: 8, alignItems: "flex-start" }}>
-      {cols.map((c) => {
-        const items = rows.filter((r) => r._status === c.status);
-        const s = STATUS[c.status];
+    <div
+      style={{
+        border: "1.5px dashed var(--red-200)",
+        background: "var(--red-50)",
+        borderRadius: 10,
+        padding: "4px 14px",
+      }}
+    >
+      {rows.map((r, i) => {
+        const lateMins = minutesBetween(r.shift.starts_at, new Date(nowMs).toISOString());
         return (
           <div
-            key={c.status}
-            style={{ flex: "1 1 0", minWidth: 248, display: "flex", flexDirection: "column", gap: 10 }}
+            key={r.shift.id}
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 9,
+              padding: "7px 0",
+              borderTop: i > 0 ? "1px solid var(--red-100)" : "none",
+              fontSize: 13,
+            }}
           >
-            <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "2px 2px" }}>
-              <span style={{ width: 8, height: 8, borderRadius: "50%", background: s.dot }} />
-              <span style={{ fontSize: 13, fontWeight: 600, color: "var(--adaptive-800)" }}>{c.label}</span>
-              <span
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  color: "var(--adaptive-400)",
-                  background: "var(--adaptive-100)",
-                  borderRadius: 9999,
-                  padding: "0 8px",
-                  minWidth: 22,
-                  textAlign: "center",
-                }}
-              >
-                {items.length}
-              </span>
-            </div>
-            {items.length === 0 ? (
-              <div
-                style={{
-                  fontSize: 12,
-                  color: "var(--adaptive-400)",
-                  padding: "14px 0",
-                  textAlign: "center",
-                  border: "1px dashed var(--adaptive-200)",
-                  borderRadius: 8,
-                }}
-              >
-                None
-              </div>
-            ) : (
-              items.map((r) => (
-                <WorkerCard
-                  key={r.shift.id}
-                  row={r}
-                  nowMs={nowMs}
-                  locationName={locationName(r.shift.location_id)}
-                  onSelect={onSelect}
-                />
-              ))
-            )}
+            <Icon name="alert" size={15} color="var(--red-500)" />
+            <span style={{ color: "var(--adaptive-800)", minWidth: 0 }}>
+              <strong style={{ fontWeight: 600 }}>{r.employee_name}</strong> hasn&rsquo;t checked
+              in — shift started {formatTime(r.shift.starts_at)}
+              {lateMins > 0 ? ` (${fmtDur(lateMins)} ago)` : ""} · {locationName(r.shift.location_id)}
+            </span>
+            <button
+              onClick={() => onSelect(r)}
+              style={{
+                marginLeft: "auto",
+                flexShrink: 0,
+                border: "1px solid var(--adaptive-200)",
+                borderRadius: 6,
+                background: "var(--card)",
+                padding: "3px 11px",
+                fontFamily: "inherit",
+                fontSize: 12,
+                fontWeight: 600,
+                color: "var(--adaptive-600)",
+                cursor: "pointer",
+              }}
+            >
+              View
+            </button>
           </div>
         );
       })}
     </div>
+  );
+}
+
+const HOUR_MS = 3_600_000;
+const RAIL_W = 216;
+// Cap the axis so one outlier shift (e.g. crossing far past midnight) can't
+// stretch every bar into illegibility; clipped bars get a "→" marker.
+const MAX_AXIS_MS = 18 * HOUR_MS;
+
+function floorToLocalHour(ms: number): number {
+  const d = new Date(ms);
+  d.setMinutes(0, 0, 0);
+  return d.getTime();
+}
+
+// Per-status one-liner under the employee name.
+function railMeta(r: Row, nowMs: number): string {
+  switch (r._status) {
+    case "working": {
+      const mins = r.check_in_at ? minutesBetween(r.check_in_at, new Date(nowMs).toISOString()) : null;
+      return mins != null ? `On shift ${fmtDur(mins)}` : "On shift";
+    }
+    case "break":
+      return "On break";
+    case "late":
+      return "Not checked in";
+    case "done":
+      return `Done ${r.check_in_at ? formatTime(r.check_in_at) : "—"}–${
+        r.check_out_at ? formatTime(r.check_out_at) : "—"
+      }`;
+    default:
+      return `Starts ${formatTime(r.shift.starts_at)}`;
+  }
+}
+
+function Timeline({
+  rows,
+  nowMs,
+  locationName,
+  onSelect,
+}: {
+  rows: Row[];
+  nowMs: number;
+  locationName: (id?: string | null) => string;
+  onSelect: (r: Row) => void;
+}) {
+  if (rows.length === 0) {
+    return (
+      <Card style={{ padding: "40px 24px", textAlign: "center", color: "var(--adaptive-500)", fontSize: 13 }}>
+        No one matches this filter.
+      </Card>
+    );
+  }
+
+  // Axis window: fit today's shifts (plus "now") with an hour of margin,
+  // rounded to whole local hours, capped at MAX_AXIS_MS.
+  const startTimes = rows.map((r) => new Date(r.shift.starts_at).getTime());
+  const endTimes = rows.map((r) => new Date(r.shift.ends_at).getTime());
+  const axisStart = floorToLocalHour(Math.min(...startTimes, nowMs) - HOUR_MS);
+  let axisEnd = floorToLocalHour(Math.max(...endTimes, nowMs)) + HOUR_MS;
+  if (axisEnd - axisStart > MAX_AXIS_MS) {
+    axisEnd = axisStart + MAX_AXIS_MS;
+  }
+  const span = axisEnd - axisStart;
+  const pct = (ms: number) => Math.min(100, Math.max(0, ((ms - axisStart) / span) * 100));
+
+  // Hour ticks: pick a step that yields at most ~8 labels (4h blocks for a
+  // full-day span; never 3h).
+  const spanHours = span / HOUR_MS;
+  const stepH = [1, 2, 4, 6].find((s) => spanHours / s <= 8) ?? 6;
+  const ticks: number[] = [];
+  for (let t = axisStart; t <= axisEnd; t += stepH * HOUR_MS) {
+    ticks.push(t);
+  }
+
+  const nowPct = pct(nowMs);
+  const sorted = [...rows].sort(
+    (a, b) =>
+      STATUS_ORDER[a._status] - STATUS_ORDER[b._status] ||
+      new Date(a.shift.starts_at).getTime() - new Date(b.shift.starts_at).getTime() ||
+      a.employee_name.localeCompare(b.employee_name),
+  );
+
+  const gridLines = (
+    <>
+      {ticks.map((t) => (
+        <span
+          key={t}
+          style={{
+            position: "absolute",
+            left: `${pct(t)}%`,
+            top: 0,
+            bottom: 0,
+            width: 1,
+            background: "var(--adaptive-100)",
+          }}
+        />
+      ))}
+      <span
+        style={{
+          position: "absolute",
+          left: `${nowPct}%`,
+          top: 0,
+          bottom: 0,
+          width: 2,
+          background: "var(--primary-500)",
+          opacity: 0.85,
+        }}
+      />
+    </>
+  );
+
+  return (
+    <Card style={{ padding: "4px 18px 6px", overflowX: "auto" }}>
+      <div style={{ minWidth: 720 }}>
+        {/* axis */}
+        <div
+          style={{
+            display: "grid",
+            gridTemplateColumns: `${RAIL_W}px 1fr`,
+            borderBottom: "1px solid var(--adaptive-200)",
+          }}
+        >
+          <div />
+          <div style={{ position: "relative", height: 30 }}>
+            {/* hide hour labels the NOW pill would collide with */}
+            {ticks.filter((t) => Math.abs(pct(t) - nowPct) > 5).map((t) => (
+              <span
+                key={t}
+                style={{
+                  position: "absolute",
+                  left: `${pct(t)}%`,
+                  bottom: 5,
+                  transform: "translateX(-50%)",
+                  fontSize: 10.5,
+                  color: "var(--adaptive-400)",
+                  fontFeatureSettings: "'tnum'",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {formatTime(new Date(t).toISOString())}
+              </span>
+            ))}
+            <span
+              style={{
+                position: "absolute",
+                left: `${nowPct}%`,
+                top: 3,
+                transform: "translateX(-50%)",
+                background: "var(--primary-500)",
+                color: "#fff",
+                fontSize: 10,
+                fontWeight: 700,
+                padding: "1px 7px",
+                borderRadius: 9999,
+                whiteSpace: "nowrap",
+              }}
+            >
+              {formatTime(new Date(nowMs).toISOString())}
+            </span>
+          </div>
+        </div>
+
+        {/* rows */}
+        {sorted.map((r, i) => {
+          const s = STATUS[r._status];
+          const shiftStart = new Date(r.shift.starts_at).getTime();
+          const shiftEnd = new Date(r.shift.ends_at).getTime();
+          const clipped = shiftEnd > axisEnd;
+          const schedLeft = pct(shiftStart);
+          const schedWidth = Math.max(pct(shiftEnd) - schedLeft, 0.5);
+          const inMs = r.check_in_at ? new Date(r.check_in_at).getTime() : null;
+          const outMs = r.check_out_at ? new Date(r.check_out_at).getTime() : null;
+          const actualEnd = outMs ?? nowMs;
+          return (
+            <div
+              key={r.shift.id}
+              onClick={() => onSelect(r)}
+              style={{
+                display: "grid",
+                gridTemplateColumns: `${RAIL_W}px 1fr`,
+                borderBottom: i < sorted.length - 1 ? "1px solid var(--adaptive-100)" : "none",
+                cursor: "pointer",
+                opacity: r._status === "upcoming" ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => (e.currentTarget.style.background = "var(--adaptive-50)")}
+              onMouseLeave={(e) => (e.currentTarget.style.background = "transparent")}
+            >
+              <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "9px 12px 9px 2px", minWidth: 0 }}>
+                <Avatar person={{ id: r.employee_id, name: r.employee_name }} size={30} />
+                <div style={{ minWidth: 0 }}>
+                  <div
+                    style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: "var(--adaptive-900)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                    }}
+                  >
+                    {r.employee_name}
+                  </div>
+                  <div
+                    style={{
+                      fontSize: 11,
+                      color: "var(--adaptive-500)",
+                      whiteSpace: "nowrap",
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      fontFeatureSettings: "'tnum'",
+                    }}
+                  >
+                    <span style={{ fontWeight: 600, color: s.fg }}>{railMeta(r, nowMs)}</span>
+                    {" · "}
+                    {locationName(r.shift.location_id)}
+                  </div>
+                </div>
+              </div>
+
+              <div style={{ position: "relative", height: 48 }}>
+                {gridLines}
+                {/* scheduled window */}
+                <span
+                  style={{
+                    position: "absolute",
+                    top: 10,
+                    height: 26,
+                    left: `${schedLeft}%`,
+                    width: `${schedWidth}%`,
+                    border: "1.5px dashed var(--adaptive-300)",
+                    borderRadius: 6,
+                    boxSizing: "border-box",
+                  }}
+                />
+                {/* actual worked segment */}
+                {inMs != null && actualEnd > inMs && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      height: 26,
+                      left: `${pct(inMs)}%`,
+                      width: `${Math.max(pct(actualEnd) - pct(inMs), 0.4)}%`,
+                      background: s.dot,
+                      opacity: 0.75,
+                      borderRadius: 6,
+                    }}
+                  />
+                )}
+                {/* missed-start marker */}
+                {r._status === "late" && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 7,
+                      height: 32,
+                      left: `${schedLeft}%`,
+                      width: 2.5,
+                      background: "var(--red-500)",
+                      borderRadius: 2,
+                    }}
+                  />
+                )}
+                {clipped && (
+                  <span
+                    style={{
+                      position: "absolute",
+                      top: 15,
+                      right: 2,
+                      fontSize: 12,
+                      color: "var(--adaptive-400)",
+                    }}
+                  >
+                    →
+                  </span>
+                )}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    </Card>
   );
 }
 
@@ -695,7 +856,7 @@ export function LiveView({
   onRefresh: () => void;
   loading: boolean;
 }) {
-  const [layout, setLayout] = useState<Layout>("board");
+  const [layout, setLayout] = useState<Layout>("timeline");
   const [filter, setFilter] = useState<LiveStatus | null>(null);
   const [sel, setSel] = useState<Row | null>(null);
   const nowMs = Date.now();
@@ -705,6 +866,7 @@ export function LiveView({
   const count = (st: LiveStatus) => rows.filter((r) => r._status === st).length;
   const shown = filter ? rows.filter((r) => r._status === filter) : rows;
   const locationName = (id?: string | null) => (id ? locationNames.get(id) ?? "Unknown" : "Unassigned");
+  const lateRows = rows.filter((r) => r._status === "late");
 
   // On leave today: distinct employees with an approved request covering today.
   const onLeaveCount = (() => {
@@ -717,8 +879,16 @@ export function LiveView({
     return ids.size;
   })();
 
+  const chips: { status: LiveStatus; label: string }[] = [
+    { status: "working", label: "on shift" },
+    { status: "break", label: "on break" },
+    { status: "late", label: "not checked in" },
+    { status: "upcoming", label: "upcoming" },
+    { status: "done", label: "done" },
+  ];
+
   return (
-    <div style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 18 }}>
+    <div style={{ padding: "20px 24px 32px", display: "flex", flexDirection: "column", gap: 16 }}>
       <div style={{ display: "flex", alignItems: "flex-end", gap: 16, flexWrap: "wrap" }}>
         <div style={{ flex: 1, minWidth: 220 }}>
           <h1
@@ -763,34 +933,19 @@ export function LiveView({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap" }}>
-        <KpiCard label="On shift" dot="var(--green-500)" value={count("working")} active={filter === "working"} onClick={() => setFilter(filter === "working" ? null : "working")} />
-        <KpiCard label="On break" dot="var(--amber-500)" value={count("break")} active={filter === "break"} onClick={() => setFilter(filter === "break" ? null : "break")} />
-        <KpiCard label="Not checked in" dot="var(--red-500)" value={count("late")} active={filter === "late"} onClick={() => setFilter(filter === "late" ? null : "late")} />
-        <KpiCard label="Upcoming" dot="var(--adaptive-400)" value={count("upcoming")} active={filter === "upcoming"} onClick={() => setFilter(filter === "upcoming" ? null : "upcoming")} />
-        <KpiCard label="Checked out" dot="var(--blue-500)" value={count("done")} active={filter === "done"} onClick={() => setFilter(filter === "done" ? null : "done")} />
-        <LeaveKpi value={onLeaveCount} />
+      <div style={{ display: "flex", gap: 8, flexWrap: "wrap", alignItems: "center" }}>
+        {chips.map((c) => (
+          <StatChip
+            key={c.status}
+            label={c.label}
+            value={count(c.status)}
+            dot={STATUS[c.status].dot}
+            active={filter === c.status}
+            onClick={() => setFilter(filter === c.status ? null : c.status)}
+          />
+        ))}
+        <StatChip label="on leave" value={onLeaveCount} />
       </div>
-
-      {filter && (
-        <div style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 13, color: "var(--adaptive-600)" }}>
-          Filtered by <StatusChip status={filter} small />
-          <button
-            onClick={() => setFilter(null)}
-            style={{
-              border: 0,
-              background: "none",
-              color: "var(--primary-600)",
-              fontWeight: 600,
-              cursor: "pointer",
-              fontFamily: "inherit",
-              fontSize: 13,
-            }}
-          >
-            Clear
-          </button>
-        </div>
-      )}
 
       {rows.length === 0 ? (
         <Card style={{ padding: 0 }}>
@@ -807,12 +962,19 @@ export function LiveView({
             No published shifts in the current window.
           </div>
         </Card>
-      ) : layout === "board" ? (
-        <Board rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
-      ) : layout === "map" ? (
-        <MapView rows={shown} locationName={locationName} onSelect={setSel} />
       ) : (
-        <ListView rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+        <>
+          {layout === "timeline" && filter !== "late" && (
+            <AttentionBanner rows={lateRows} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+          )}
+          {layout === "timeline" ? (
+            <Timeline rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+          ) : layout === "map" ? (
+            <MapView rows={shown} locationName={locationName} onSelect={setSel} />
+          ) : (
+            <ListView rows={shown} nowMs={nowMs} locationName={locationName} onSelect={setSel} />
+          )}
+        </>
       )}
 
       {sel && (

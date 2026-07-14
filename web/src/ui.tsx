@@ -33,7 +33,9 @@ export type IconName =
   | "x"
   | "route"
   | "pencil"
-  | "wifi";
+  | "wifi"
+  | "mail"
+  | "lock";
 
 const ICON_PATHS: Record<IconName, string> = {
   activity: "M22 12h-4l-3 9L9 3l-3 9H2",
@@ -71,6 +73,8 @@ const ICON_PATHS: Record<IconName, string> = {
     "M6 19a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM18 11a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM9 16h6a3 3 0 0 0 0-6H9a3 3 0 0 1 0-6h0",
   pencil: "M12 20h9M16.5 3.5a2.12 2.12 0 0 1 3 3L7 19l-4 1 1-4z",
   wifi: "M5 12.55a11 11 0 0 1 14 0M8.5 16.1a6 6 0 0 1 7 0M2 8.82a15 15 0 0 1 20 0M12 20h.01",
+  mail: "M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2zM22 6l-10 7L2 6",
+  lock: "M5 11h14a2 2 0 0 1 2 2v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-7a2 2 0 0 1 2-2zM7 11V7a5 5 0 0 1 10 0v4",
 };
 
 export function Icon({
@@ -156,6 +160,19 @@ export function initials(name: string): string {
     return parts[0].slice(0, 2).toUpperCase();
   }
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase();
+}
+
+// Brand mark — the vortex logo served from public/logo.svg (also the favicon).
+export function OperoMark({ size = 28 }: { size?: number }) {
+  return (
+    <img
+      src="/logo.svg"
+      width={size}
+      height={size}
+      alt=""
+      style={{ display: "block", flexShrink: 0 }}
+    />
+  );
 }
 
 export type Person = { id: string; name: string };
