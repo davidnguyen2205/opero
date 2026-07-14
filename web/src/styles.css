@@ -6,6 +6,8 @@
   --background: #ffffff;
   --foreground: #0c0a09;
   --card: #ffffff;
+  /* Login page ground: warm cream in light (Blazeup reference), near-black in dark. */
+  --auth-ground: #fefbf6;
 
   /* Primary (orange accent) */
   --primary-50: #fff7ed;
@@ -74,6 +76,72 @@
   font-synthesis: none;
   text-rendering: optimizeLegibility;
   -webkit-font-smoothing: antialiased;
+}
+
+/* Dark theme — activated by ThemeToggle stamping data-theme on <html>.
+   Same token names, second value set: warm near-black grounds (matching the
+   orange brand), inverted adaptive scale, dark tints for the semantic 50–200
+   surfaces and lightened 600/700 semantic text. */
+:root[data-theme="dark"] {
+  /* Palette lifted from the Live View wireframe's dark mode: cool charcoal
+     grounds, slate neutrals, and muted status hues (sage/gold/brick/dusty
+     blue) instead of the light theme's vivid ones. */
+  --background: #191b1f;
+  --foreground: #e6e8ec;
+  --card: #212429;
+  --auth-ground: #191b1f;
+
+  --primary-50: #2e2019;
+  --primary-100: #3c2818;
+  --primary-200: #55351a;
+
+  --adaptive-50: #24272c;
+  --adaptive-100: #2b2f36;
+  --adaptive-200: #33373f;
+  --adaptive-300: #4b515c;
+  --adaptive-400: #767d89;
+  --adaptive-500: #a2a8b3;
+  --adaptive-600: #b6bcc6;
+  --adaptive-700: #cdd2da;
+  --adaptive-800: #dde1e7;
+  --adaptive-900: #e6e8ec;
+  --adaptive-950: #f4f6f8;
+
+  --green-50: #22302a;
+  --green-100: #263832;
+  --green-200: #33463d;
+  --green-400: #7db898;
+  --green-500: #6aa885;
+  --green-600: #86bfa0;
+  --green-700: #9fcdb4;
+
+  --red-50: #322323;
+  --red-100: #402b2a;
+  --red-200: #553734;
+  --red-500: #c97a75;
+  --red-600: #d18f8a;
+  --red-700: #e0aca8;
+
+  --amber-50: #2e2a1e;
+  --amber-100: #383223;
+  --amber-200: #4a4029;
+  --amber-500: #c9a050;
+  --amber-600: #d4b269;
+  --amber-700: #dcc084;
+
+  --blue-50: #232a34;
+  --blue-100: #2b3441;
+  --blue-200: #394656;
+  --blue-500: #7d9dc0;
+  --blue-600: #92afcf;
+  --blue-700: #b0c7e0;
+
+  --shadow-xs: 0 1px 2px rgb(0 0 0 / 0.4);
+  --shadow-sm: 0 1px 3px rgb(0 0 0 / 0.45), 0 1px 2px -1px rgb(0 0 0 / 0.45);
+  --shadow-md: 0 4px 6px -1px rgb(0 0 0 / 0.45), 0 2px 4px -2px rgb(0 0 0 / 0.45);
+  --shadow-lg: 0 10px 15px -3px rgb(0 0 0 / 0.5), 0 4px 6px -4px rgb(0 0 0 / 0.5);
+
+  color-scheme: dark;
 }
 
 * {

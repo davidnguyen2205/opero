@@ -321,18 +321,31 @@ function Sidebar({
   );
 }
 
+type Theme = "light" | "dark";
+
+// Reads the persisted choice, falling back to the OS preference.
+function initialTheme(): Theme {
+  const saved = localStorage.getItem("opero-theme");
+  if (saved === "light" || saved === "dark") return saved;
+  return window.matchMedia("(prefers-color-scheme: dark)").matches ? "dark" : "light";
+}
+
 function TopBar({
   view,
   crumb,
   onCrumbRoot,
   loading,
   onRefresh,
+  theme,
+  onToggleTheme,
 }: {
   view: View;
   crumb?: string | null;
   onCrumbRoot?: () => void;
   loading: boolean;
   onRefresh: () => void;
+  theme: Theme;
+  onToggleTheme: () => void;
 }) {
   return (
     <header
@@ -439,6 +452,24 @@ function TopBar({
           }}
         />
       </button>
+      <button
+        onClick={onToggleTheme}
+        title={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        aria-label={theme === "dark" ? "Switch to light theme" : "Switch to dark theme"}
+        style={{
+          width: 36,
+          height: 36,
+          borderRadius: 6,
+          border: "1px solid var(--adaptive-200)",
+          background: "var(--card)",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <Icon name={theme === "dark" ? "sun" : "moon"} size={17} color="var(--adaptive-600)" />
+      </button>
     </header>
   );
 }
@@ -487,6 +518,12 @@ function Banner({ kind, children, onClose }: { kind: "error" | "notice"; childre
 }
 
 export function App() {
+  const [theme, setTheme] = useState<Theme>(initialTheme);
+  useEffect(() => {
+    document.documentElement.dataset.theme = theme;
+    localStorage.setItem("opero-theme", theme);
+  }, [theme]);
+
   const [auth, setAuth] = useState<AuthResponse | null>(null);
   const [currentUser, setCurrentUser] = useState<CurrentUserResponse | null>(null);
   const [view, setView] = useState<View>("live");
@@ -538,6 +575,23 @@ export function App() {
   useEffect(() => {
     void loadData();
   }, [loadData]);
+
+  // Scoped refresh for the Live View: refetches only what that page shows
+  // instead of reloading every resource.
+  const [liveLoading, setLiveLoading] = useState(false);
+  const refreshLive = useCallback(async () => {
+    setLiveLoading(true);
+    setError(null);
+    try {
+      const [liveList, leaveList] = await Promise.all([liveApi.list(), leaveApi.list()]);
+      setLive(liveList);
+      setLeaveRequests(leaveList);
+    } catch (err) {
+      setError(describeError(err, "Unable to refresh the live view."));
+    } finally {
+      setLiveLoading(false);
+    }
+  }, []);
 
   const departmentNames = useMemo(() => new Map(departments.map((d) => [d.id, d.name])), [departments]);
   const roleNames = useMemo(() => new Map(roles.map((r) => [r.id, r.name])), [roles]);
@@ -613,6 +667,8 @@ export function App() {
           onCrumbRoot={() => setSelectedEmployee(null)}
           loading={loading}
           onRefresh={() => void loadData()}
+          theme={theme}
+          onToggleTheme={() => setTheme(theme === "dark" ? "light" : "dark")}
         />
         <div style={{ flex: 1, overflow: "auto", background: "var(--background)" }}>
           {view === "live" && (
@@ -620,8 +676,11 @@ export function App() {
               entries={live}
               leaveRequests={leaveRequests}
               locationNames={locationNames}
-              onRefresh={() => void loadData()}
-              loading={loading}
+              employees={employees}
+              departments={departments}
+              tours={tours}
+              onRefresh={() => void refreshLive()}
+              loading={loading || liveLoading}
             />
           )}
           {view === "roster" && (
