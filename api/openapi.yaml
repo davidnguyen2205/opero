@@ -2640,6 +2640,13 @@ components:
         check_out_photo_url:
           type: string
           nullable: true
+        break_started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When the current break began. Set while status is on_break; null
+            once the break ends (resume or check-out).
         status:
           type: string
           enum: [checked_in, checked_out, missed, on_break]
@@ -2739,6 +2746,13 @@ components:
           type: number
           format: double
           nullable: true
+        break_started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: >
+            When the current break began; only set while attendance_status is
+            on_break.
 
     LeaveType:
       type: string

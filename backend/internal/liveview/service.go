@@ -39,6 +39,7 @@ type Entry struct {
 	CheckOutAt       *time.Time
 	CheckInLat       *float64
 	CheckInLng       *float64
+	BreakStartedAt   *time.Time
 }
 
 type Service struct {
@@ -103,6 +104,7 @@ func (s *Service) LiveView(ctx context.Context, from, to time.Time) ([]Entry, er
 			e.CheckOutAt = rec.CheckOutAt
 			e.CheckInLat = rec.CheckInLat
 			e.CheckInLng = rec.CheckInLng
+			e.BreakStartedAt = rec.BreakStartedAt
 		}
 		entries = append(entries, e)
 	}
