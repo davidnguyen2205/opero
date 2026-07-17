@@ -18,6 +18,27 @@ type fakeRepo struct {
 	lastListFilter  ShiftFilter
 }
 
+func (f *fakeRepo) ListShiftIDsByNote(_ context.Context, note string) ([]uuid.UUID, error) {
+	var ids []uuid.UUID
+	for id, s := range f.shifts {
+		if s.Notes != nil && *s.Notes == note {
+			ids = append(ids, id)
+		}
+	}
+	return ids, nil
+}
+
+func (f *fakeRepo) DeleteShiftsByNote(_ context.Context, note string) (int64, error) {
+	var n int64
+	for id, s := range f.shifts {
+		if s.Notes != nil && *s.Notes == note {
+			delete(f.shifts, id)
+			n++
+		}
+	}
+	return n, nil
+}
+
 func newFakeRepo() *fakeRepo {
 	return &fakeRepo{locs: map[uuid.UUID]Location{}, shifts: map[uuid.UUID]Shift{}}
 }

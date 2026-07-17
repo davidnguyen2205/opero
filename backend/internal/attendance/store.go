@@ -93,6 +93,34 @@ func recordFromDB(a attendancedb.AttendanceRecord) Record {
 	}
 }
 
+func (s *Store) CreateDemoRecord(ctx context.Context, in DemoRecordInput) (Record, error) {
+	rec, err := s.q.CreateDemoAttendance(ctx, attendancedb.CreateDemoAttendanceParams{
+		EmployeeID:     in.EmployeeID,
+		ShiftID:        toPgUUID(in.ShiftID),
+		ClientID:       uuid.New(),
+		CheckInAt:      toPgTimestamptz(in.CheckInAt),
+		CheckInLat:     in.CheckInLat,
+		CheckInLng:     in.CheckInLng,
+		CheckOutAt:     toPgTimestamptz(in.CheckOutAt),
+		CheckOutLat:    in.CheckOutLat,
+		CheckOutLng:    in.CheckOutLng,
+		BreakStartedAt: toPgTimestamptz(in.BreakStartedAt),
+		Status:         in.Status,
+	})
+	if err != nil {
+		return Record{}, fmt.Errorf("create demo attendance: %w", mapErr(err))
+	}
+	return recordFromDB(rec), nil
+}
+
+func (s *Store) DeleteByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) (int64, error) {
+	n, err := s.q.DeleteAttendanceByShiftIDs(ctx, shiftIDs)
+	if err != nil {
+		return 0, fmt.Errorf("delete attendance by shift ids: %w", mapErr(err))
+	}
+	return n, nil
+}
+
 func (s *Store) GetByClientID(ctx context.Context, clientID uuid.UUID) (Record, error) {
 	a, err := s.q.GetAttendanceByClientID(ctx, clientID)
 	if err != nil {

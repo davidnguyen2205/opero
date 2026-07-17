@@ -67,6 +67,19 @@ func (q *Queries) DeleteShift(ctx context.Context, id uuid.UUID) (int64, error) 
 	return result.RowsAffected(), nil
 }
 
+const deleteShiftsByNote = `-- name: DeleteShiftsByNote :execrows
+DELETE FROM shifts WHERE notes = $1
+`
+
+// Demo tooling: remove shifts tagged by the seeder (exact note match).
+func (q *Queries) DeleteShiftsByNote(ctx context.Context, notes *string) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteShiftsByNote, notes)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getShift = `-- name: GetShift :one
 SELECT id, employee_id, location_id, starts_at, ends_at, notes, status, created_at, updated_at, tour_id FROM shifts WHERE id = $1
 `
@@ -87,6 +100,31 @@ func (q *Queries) GetShift(ctx context.Context, id uuid.UUID) (Shift, error) {
 		&i.TourID,
 	)
 	return i, err
+}
+
+const listShiftIDsByNote = `-- name: ListShiftIDsByNote :many
+SELECT id FROM shifts WHERE notes = $1
+`
+
+// Demo tooling: find shifts tagged by the seeder (exact note match).
+func (q *Queries) ListShiftIDsByNote(ctx context.Context, notes *string) ([]uuid.UUID, error) {
+	rows, err := q.db.Query(ctx, listShiftIDsByNote, notes)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []uuid.UUID
+	for rows.Next() {
+		var id uuid.UUID
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		items = append(items, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
 }
 
 const listShifts = `-- name: ListShifts :many

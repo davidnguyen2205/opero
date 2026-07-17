@@ -26,6 +26,8 @@ tags:
     description: Time-off requests and per-employee leave balances (tenant data).
   - name: tours
     description: Tour catalog and management — the experiences a tenant offers (tenant data).
+  - name: demo
+    description: Demo tooling — available only to the configured demo tenant.
 
 paths:
   /auth/signup:
@@ -1291,6 +1293,33 @@ paths:
                   $ref: '#/components/schemas/Shift'
         '401':
           $ref: '#/components/responses/Unauthorized'
+
+  /demo/seed-live-view:
+    post:
+      operationId: seedLiveViewDemoData
+      tags: [demo]
+      summary: Re-seed the demo tenant's live view data, anchored to now.
+      description: >
+        Replaces the demo tenant's seeded shifts (and their attendance) with a
+        fresh set anchored to the current time, so the live view shows a
+        realistic mix of states: checked in, on break (with break start),
+        checked out, not checked in, and upcoming. Only shifts previously
+        created by this endpoint are replaced; manually created data is left
+        untouched. Rejected with 403 for every tenant except the one named by
+        the server's DEMO_TENANT_SLUG configuration.
+      security:
+        - bearerAuth: ["manager"]
+      responses:
+        '200':
+          description: Summary of the seeded data.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SeedLiveViewResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
 
   /live:
     get:
@@ -2753,6 +2782,17 @@ components:
           description: >
             When the current break began; only set while attendance_status is
             on_break.
+
+    SeedLiveViewResponse:
+      type: object
+      required: [shifts, attendance_records]
+      properties:
+        shifts:
+          type: integer
+          description: Number of shifts created.
+        attendance_records:
+          type: integer
+          description: Number of attendance records created.
 
     LeaveType:
       type: string

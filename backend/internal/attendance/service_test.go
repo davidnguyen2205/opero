@@ -68,6 +68,29 @@ func (f *fakeRepo) List(context.Context, AttendanceFilter) ([]Record, error) {
 	}
 	return out, nil
 }
+func (f *fakeRepo) CreateDemoRecord(_ context.Context, in DemoRecordInput) (Record, error) {
+	r := Record{
+		ID: uuid.New(), EmployeeID: in.EmployeeID, ShiftID: in.ShiftID, ClientID: uuid.New(),
+		CheckInAt: in.CheckInAt, CheckOutAt: in.CheckOutAt,
+		BreakStartedAt: in.BreakStartedAt, Status: in.Status,
+	}
+	f.byClient[r.ClientID] = r
+	return r, nil
+}
+func (f *fakeRepo) DeleteByShiftIDs(_ context.Context, shiftIDs []uuid.UUID) (int64, error) {
+	want := make(map[uuid.UUID]bool, len(shiftIDs))
+	for _, id := range shiftIDs {
+		want[id] = true
+	}
+	var n int64
+	for cid, r := range f.byClient {
+		if r.ShiftID != nil && want[*r.ShiftID] {
+			delete(f.byClient, cid)
+			n++
+		}
+	}
+	return n, nil
+}
 func (f *fakeRepo) ListByShiftIDs(_ context.Context, shiftIDs []uuid.UUID) ([]Record, error) {
 	want := make(map[uuid.UUID]bool, len(shiftIDs))
 	for _, id := range shiftIDs {

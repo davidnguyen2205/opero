@@ -28,6 +28,8 @@ type repo interface {
 	UpdateShift(ctx context.Context, id uuid.UUID, in UpdateShiftInput) (Shift, error)
 	PublishShift(ctx context.Context, id uuid.UUID) (Shift, error)
 	DeleteShift(ctx context.Context, id uuid.UUID) error
+	ListShiftIDsByNote(ctx context.Context, note string) ([]uuid.UUID, error)
+	DeleteShiftsByNote(ctx context.Context, note string) (int64, error)
 }
 
 // EmployeeResolver maps a control-plane user id to its tenant employee id.
@@ -129,6 +131,43 @@ func (s *Service) CreateShift(ctx context.Context, in CreateShiftInput) (Shift, 
 		return Shift{}, err
 	}
 	return st.CreateShift(ctx, in, statusDraft)
+}
+
+// CreatePublishedShift creates a shift directly in the published state. Demo
+// tooling only (the normal flow is CreateShift → PublishShift); validation is
+// identical to CreateShift.
+func (s *Service) CreatePublishedShift(ctx context.Context, in CreateShiftInput) (Shift, error) {
+	if in.EmployeeID == uuid.Nil {
+		return Shift{}, fmt.Errorf("%w: employee_id is required", ErrValidation)
+	}
+	if in.StartsAt.IsZero() || in.EndsAt.IsZero() || !in.EndsAt.After(in.StartsAt) {
+		return Shift{}, fmt.Errorf("%w: a valid starts_at/ends_at window is required", ErrValidation)
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return Shift{}, err
+	}
+	return st.CreateShift(ctx, in, "published")
+}
+
+// ShiftIDsByNote returns ids of shifts whose note matches exactly (how the
+// demo seeder tags its shifts).
+func (s *Service) ShiftIDsByNote(ctx context.Context, note string) ([]uuid.UUID, error) {
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return st.ListShiftIDsByNote(ctx, note)
+}
+
+// DeleteShiftsByNote removes all shifts whose note matches exactly. Demo
+// tooling only.
+func (s *Service) DeleteShiftsByNote(ctx context.Context, note string) (int64, error) {
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return st.DeleteShiftsByNote(ctx, note)
 }
 
 func (s *Service) GetShift(ctx context.Context, id uuid.UUID) (Shift, error) {

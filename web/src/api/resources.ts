@@ -10,6 +10,7 @@ export type Role = components["schemas"]["Role"];
 export type AccessLevel = components["schemas"]["AccessLevel"];
 export type Shift = components["schemas"]["Shift"];
 export type LiveViewEntry = components["schemas"]["LiveViewEntry"];
+export type SeedLiveViewResponse = components["schemas"]["SeedLiveViewResponse"];
 export type LeaveRequest = components["schemas"]["LeaveRequest"];
 export type LeaveStatus = components["schemas"]["LeaveStatus"];
 export type AttendanceRecord = components["schemas"]["AttendanceRecord"];
@@ -274,6 +275,17 @@ export const liveApi = {
     return unwrap(
       await api.GET("/live", { params: { query: filters } }),
       "Unable to load the live view.",
+    );
+  },
+};
+
+// Demo tooling: rebuild the demo tenant's live-view data anchored to now.
+// Server-gated to the tenant named by DEMO_TENANT_SLUG; 403 for everyone else.
+export const demoApi = {
+  async seedLiveView(): Promise<SeedLiveViewResponse> {
+    return unwrap(
+      await api.POST("/demo/seed-live-view"),
+      "Unable to seed demo data.",
     );
   },
 };

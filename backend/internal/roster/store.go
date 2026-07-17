@@ -233,3 +233,19 @@ func (s *Store) DeleteShift(ctx context.Context, id uuid.UUID) error {
 	}
 	return nil
 }
+
+func (s *Store) ListShiftIDsByNote(ctx context.Context, note string) ([]uuid.UUID, error) {
+	ids, err := s.q.ListShiftIDsByNote(ctx, &note)
+	if err != nil {
+		return nil, fmt.Errorf("list shift ids by note: %w", mapErr(err))
+	}
+	return ids, nil
+}
+
+func (s *Store) DeleteShiftsByNote(ctx context.Context, note string) (int64, error) {
+	n, err := s.q.DeleteShiftsByNote(ctx, &note)
+	if err != nil {
+		return 0, fmt.Errorf("delete shifts by note: %w", mapErr(err))
+	}
+	return n, nil
+}

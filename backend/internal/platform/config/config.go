@@ -46,6 +46,11 @@ type Config struct {
 	// Storage holds the object-store settings for media uploads (check-in
 	// photos). Backed by MinIO locally; any S3-compatible service in prod.
 	Storage StorageConfig
+
+	// DemoTenantSlug names the one tenant allowed to use the demo seeding
+	// endpoint (DEMO_TENANT_SLUG). Empty disables demo seeding entirely —
+	// the safe default for production.
+	DemoTenantSlug string
 }
 
 // StorageConfig holds object-storage (S3/MinIO) settings for media uploads.
@@ -81,6 +86,7 @@ func Load() (*Config, error) {
 	}
 	cfg.LogLevel = parseLevel(getEnv("LOG_LEVEL", "info"))
 	cfg.CORSAllowedOrigins = parseList(getEnv("CORS_ALLOWED_ORIGINS", ""))
+	cfg.DemoTenantSlug = getEnv("DEMO_TENANT_SLUG", "")
 
 	ttl, err := time.ParseDuration(getEnv("JWT_TTL", "24h"))
 	if err != nil {

@@ -37,6 +37,22 @@ type Record struct {
 	UpdatedAt        time.Time
 }
 
+// DemoRecordInput is a fully specified attendance record used by the demo
+// seeder — fabricated timestamps and state, unlike the real check-in flow
+// which always stamps now().
+type DemoRecordInput struct {
+	EmployeeID     uuid.UUID
+	ShiftID        *uuid.UUID
+	CheckInAt      *time.Time
+	CheckInLat     *float64
+	CheckInLng     *float64
+	CheckOutAt     *time.Time
+	CheckOutLat    *float64
+	CheckOutLng    *float64
+	BreakStartedAt *time.Time
+	Status         string
+}
+
 type CheckInInput struct {
 	ClientID uuid.UUID
 	ShiftID  *uuid.UUID

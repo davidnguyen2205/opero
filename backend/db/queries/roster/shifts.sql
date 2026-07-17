@@ -33,3 +33,11 @@ RETURNING *;
 
 -- name: DeleteShift :execrows
 DELETE FROM shifts WHERE id = $1;
+
+-- name: ListShiftIDsByNote :many
+-- Demo tooling: find shifts tagged by the seeder (exact note match).
+SELECT id FROM shifts WHERE notes = $1;
+
+-- name: DeleteShiftsByNote :execrows
+-- Demo tooling: remove shifts tagged by the seeder (exact note match).
+DELETE FROM shifts WHERE notes = $1;

@@ -634,6 +634,26 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/demo/seed-live-view": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Re-seed the demo tenant's live view data, anchored to now.
+         * @description Replaces the demo tenant's seeded shifts (and their attendance) with a fresh set anchored to the current time, so the live view shows a realistic mix of states: checked in, on break (with break start), checked out, not checked in, and upcoming. Only shifts previously created by this endpoint are replaced; manually created data is left untouched. Rejected with 403 for every tenant except the one named by the server's DEMO_TENANT_SLUG configuration.
+         */
+        post: operations["seedLiveViewDemoData"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/live": {
         parameters: {
             query?: never;
@@ -1398,6 +1418,12 @@ export interface components {
              * @description When the current break began; only set while attendance_status is on_break.
              */
             break_started_at?: string | null;
+        };
+        SeedLiveViewResponse: {
+            /** @description Number of shifts created. */
+            shifts: number;
+            /** @description Number of attendance records created. */
+            attendance_records: number;
         };
         /**
          * @description Kind of leave being requested.
@@ -2817,6 +2843,28 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+        };
+    };
+    seedLiveViewDemoData: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Summary of the seeded data. */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["SeedLiveViewResponse"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
         };
     };
     getLiveView: {
