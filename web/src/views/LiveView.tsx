@@ -4,6 +4,7 @@ import {
   Avatar,
   Btn,
   Card,
+  Chip,
   Drawer,
   DrawerSectionLabel,
   Icon,
@@ -11,6 +12,7 @@ import {
   StatusChip,
   fmtDur,
   formatTime,
+  humanize,
   initials,
   leaveCoversDay,
   minutesBetween,
@@ -996,6 +998,92 @@ function DetailDrawer({
   );
 }
 
+// Leave type → chip tone. Falls back to neutral for anything unmapped.
+const LEAVE_TONE: Record<string, "neutral" | "orange" | "blue"> = {
+  holiday: "blue",
+  sick: "orange",
+  personal: "neutral",
+};
+
+const leaveDateFmt = new Intl.DateTimeFormat(undefined, {
+  weekday: "short",
+  month: "short",
+  day: "numeric",
+});
+
+// end_date is the last day on leave (leaveCoversDay is inclusive), so the
+// employee is back the following day.
+function returnDate(endDate: string): string {
+  const d = new Date(`${endDate}T00:00:00`);
+  d.setDate(d.getDate() + 1);
+  return leaveDateFmt.format(d);
+}
+
+// Roster of who is on approved leave today. Opened from the "on leave" chip;
+// these people have no shift, so they never appear as timeline rows.
+function LeaveDrawer({
+  items,
+  employeeName,
+  onClose,
+}: {
+  items: LeaveRequest[];
+  employeeName: (id: string) => string;
+  onClose: () => void;
+}) {
+  return (
+    <Drawer
+      onClose={onClose}
+      header={
+        <div style={{ minWidth: 0 }}>
+          <div style={{ fontSize: 16, fontWeight: 600, color: "var(--adaptive-900)" }}>On leave today</div>
+          <div style={{ fontSize: 12.5, color: "var(--adaptive-500)" }}>
+            {items.length} {items.length === 1 ? "person" : "people"} away
+          </div>
+        </div>
+      }
+    >
+      {items.length === 0 ? (
+        <div style={{ fontSize: 13, color: "var(--adaptive-500)" }}>No one is on approved leave today.</div>
+      ) : (
+        <div style={{ display: "flex", flexDirection: "column" }}>
+          {items.map((l) => (
+            <div
+              key={l.id}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                padding: "10px 0",
+                borderBottom: "1px solid var(--adaptive-100)",
+              }}
+            >
+              <Avatar person={{ id: l.employee_id, name: employeeName(l.employee_id) }} size={32} />
+              <div style={{ flex: 1, minWidth: 0 }}>
+                <div
+                  style={{
+                    fontSize: 13.5,
+                    fontWeight: 600,
+                    color: "var(--adaptive-900)",
+                    whiteSpace: "nowrap",
+                    overflow: "hidden",
+                    textOverflow: "ellipsis",
+                  }}
+                >
+                  {employeeName(l.employee_id)}
+                </div>
+                <div style={{ fontSize: 11.5, color: "var(--adaptive-500)", fontFeatureSettings: "'tnum'" }}>
+                  Back {returnDate(l.end_date)}
+                </div>
+              </div>
+              <Chip tone={LEAVE_TONE[l.type] ?? "neutral"}>{humanize(l.type)}</Chip>
+            </div>
+          ))}
+        </div>
+      )}
+    </Drawer>
+  );
+}
+
 export function LiveView({
   entries,
   leaveRequests,
@@ -1004,6 +1092,7 @@ export function LiveView({
   departments,
   tours,
   onRefresh,
+  onSeedDemo,
   loading,
 }: {
   entries: LiveViewEntry[];
@@ -1013,12 +1102,15 @@ export function LiveView({
   departments: Department[];
   tours: Tour[];
   onRefresh: () => void;
+  /** Present only for the demo tenant — re-seeds the live view data. */
+  onSeedDemo?: () => void;
   loading: boolean;
 }) {
   const [layout, setLayout] = useState<Layout>("timeline");
   const [filter, setFilter] = useState<LiveStatus | null>(null);
   const [groupBy, setGroupBy] = useState<GroupBy>("none");
   const [sel, setSel] = useState<Row | null>(null);
+  const [showLeave, setShowLeave] = useState(false);
   const nowMs = Date.now();
   const today = new Date();
 
@@ -1039,16 +1131,22 @@ export function LiveView({
     departmentNames: new Map(departments.map((d) => [d.id, d.name])),
   });
 
-  // On leave today: distinct employees with an approved request covering today.
-  const onLeaveCount = (() => {
-    const ids = new Set<string>();
+  // On leave today: one entry per employee with an approved request covering
+  // today (keeping the latest-ending request when several overlap), sorted by
+  // name. Powers both the chip count and the leave drawer.
+  const employeeName = (id: string) => employees.find((e) => e.id === id)?.full_name ?? "Unknown";
+  const onLeaveToday = (() => {
+    const byEmp = new Map<string, LeaveRequest>();
     for (const l of leaveRequests) {
-      if (l.status === "approved" && leaveCoversDay(l.start_date, l.end_date, today)) {
-        ids.add(l.employee_id);
-      }
+      if (l.status !== "approved" || !leaveCoversDay(l.start_date, l.end_date, today)) continue;
+      const existing = byEmp.get(l.employee_id);
+      if (!existing || l.end_date > existing.end_date) byEmp.set(l.employee_id, l);
     }
-    return ids.size;
+    return [...byEmp.values()].sort((a, b) =>
+      employeeName(a.employee_id).localeCompare(employeeName(b.employee_id)),
+    );
   })();
+  const onLeaveCount = onLeaveToday.length;
 
   const chips: { status: LiveStatus; label: string }[] = [
     { status: "working", label: "on shift" },
@@ -1121,6 +1219,11 @@ export function LiveView({
             </select>
           </label>
           <Seg value={layout} onChange={setLayout} />
+          {onSeedDemo && (
+            <Btn variant="secondary" onClick={onSeedDemo} disabled={loading}>
+              Seed demo data
+            </Btn>
+          )}
           <Btn variant="secondary" icon="refresh" title="Refresh" onClick={onRefresh} disabled={loading} />
         </div>
       </div>
@@ -1136,7 +1239,12 @@ export function LiveView({
             onClick={() => setFilter(filter === c.status ? null : c.status)}
           />
         ))}
-        <StatChip label="on leave" value={onLeaveCount} />
+        <StatChip
+          label="on leave"
+          value={onLeaveCount}
+          active={showLeave}
+          onClick={onLeaveCount > 0 ? () => setShowLeave(true) : undefined}
+        />
       </div>
 
       {rows.length === 0 ? (
@@ -1176,6 +1284,10 @@ export function LiveView({
           locationName={locationName(sel.shift.location_id)}
           onClose={() => setSel(null)}
         />
+      )}
+
+      {showLeave && (
+        <LeaveDrawer items={onLeaveToday} employeeName={employeeName} onClose={() => setShowLeave(false)} />
       )}
     </div>
   );

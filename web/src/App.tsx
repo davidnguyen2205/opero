@@ -3,6 +3,7 @@ import type { ReactNode } from "react";
 import {
   ApiError,
   authApi,
+  demoApi,
   departmentsApi,
   employeesApi,
   leaveApi,
@@ -680,6 +681,17 @@ export function App() {
               departments={departments}
               tours={tours}
               onRefresh={() => void refreshLive()}
+              onSeedDemo={
+                // Keep the slug in sync with the backend's DEMO_TENANT_SLUG;
+                // the server enforces the gate regardless.
+                currentUser?.tenant.slug === "demo"
+                  ? () =>
+                      void runMutation(
+                        async () => void (await demoApi.seedLiveView()),
+                        "Demo live view data re-seeded.",
+                      )
+                  : undefined
+              }
               loading={loading || liveLoading}
             />
           )}

@@ -6,6 +6,7 @@ import (
 	"github.com/davidnguyen2205/opero/backend/gen/oapi"
 	"github.com/davidnguyen2205/opero/backend/internal/attendance"
 	"github.com/davidnguyen2205/opero/backend/internal/controlplane"
+	"github.com/davidnguyen2205/opero/backend/internal/demoseed"
 	"github.com/davidnguyen2205/opero/backend/internal/identity"
 	"github.com/davidnguyen2205/opero/backend/internal/leave"
 	"github.com/davidnguyen2205/opero/backend/internal/liveview"
@@ -29,6 +30,7 @@ type apiHandler struct {
 	st  *stats.Handler
 	tr  *tours.Handler
 	md  *media.Handler
+	ds  *demoseed.Handler
 }
 
 var _ oapi.ServerInterface = (*apiHandler)(nil)
@@ -172,6 +174,10 @@ func (a *apiHandler) CheckOut(w http.ResponseWriter, r *http.Request) { a.at.Che
 func (a *apiHandler) SetBreak(w http.ResponseWriter, r *http.Request) { a.at.SetBreak(w, r) }
 
 // liveview
+func (a *apiHandler) SeedLiveViewDemoData(w http.ResponseWriter, r *http.Request) {
+	a.ds.SeedLiveViewDemoData(w, r)
+}
+
 func (a *apiHandler) GetLiveView(w http.ResponseWriter, r *http.Request, params oapi.GetLiveViewParams) {
 	a.lv.GetLiveView(w, r, params)
 }

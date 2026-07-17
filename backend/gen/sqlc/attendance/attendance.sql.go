@@ -110,6 +110,82 @@ func (q *Queries) CreateCheckIn(ctx context.Context, arg CreateCheckInParams) (A
 	return i, err
 }
 
+const createDemoAttendance = `-- name: CreateDemoAttendance :one
+INSERT INTO attendance_records (
+    employee_id, shift_id, client_id,
+    check_in_at, check_in_lat, check_in_lng,
+    check_out_at, check_out_lat, check_out_lng,
+    break_started_at, status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at
+`
+
+type CreateDemoAttendanceParams struct {
+	EmployeeID     uuid.UUID
+	ShiftID        pgtype.UUID
+	ClientID       uuid.UUID
+	CheckInAt      pgtype.Timestamptz
+	CheckInLat     *float64
+	CheckInLng     *float64
+	CheckOutAt     pgtype.Timestamptz
+	CheckOutLat    *float64
+	CheckOutLng    *float64
+	BreakStartedAt pgtype.Timestamptz
+	Status         string
+}
+
+// Demo tooling: insert a fully specified attendance record (fabricated
+// timestamps/state), unlike CreateCheckIn which always stamps now().
+func (q *Queries) CreateDemoAttendance(ctx context.Context, arg CreateDemoAttendanceParams) (AttendanceRecord, error) {
+	row := q.db.QueryRow(ctx, createDemoAttendance,
+		arg.EmployeeID,
+		arg.ShiftID,
+		arg.ClientID,
+		arg.CheckInAt,
+		arg.CheckInLat,
+		arg.CheckInLng,
+		arg.CheckOutAt,
+		arg.CheckOutLat,
+		arg.CheckOutLng,
+		arg.BreakStartedAt,
+		arg.Status,
+	)
+	var i AttendanceRecord
+	err := row.Scan(
+		&i.ID,
+		&i.EmployeeID,
+		&i.ShiftID,
+		&i.ClientID,
+		&i.CheckInAt,
+		&i.CheckInLat,
+		&i.CheckInLng,
+		&i.CheckInPhotoUrl,
+		&i.CheckOutAt,
+		&i.CheckOutLat,
+		&i.CheckOutLng,
+		&i.CheckOutPhotoUrl,
+		&i.Status,
+		&i.CreatedAt,
+		&i.UpdatedAt,
+		&i.BreakStartedAt,
+	)
+	return i, err
+}
+
+const deleteAttendanceByShiftIDs = `-- name: DeleteAttendanceByShiftIDs :execrows
+DELETE FROM attendance_records WHERE shift_id = ANY($1::uuid[])
+`
+
+// Demo tooling: remove attendance linked to the given (seeded) shifts.
+func (q *Queries) DeleteAttendanceByShiftIDs(ctx context.Context, dollar_1 []uuid.UUID) (int64, error) {
+	result, err := q.db.Exec(ctx, deleteAttendanceByShiftIDs, dollar_1)
+	if err != nil {
+		return 0, err
+	}
+	return result.RowsAffected(), nil
+}
+
 const getAttendance = `-- name: GetAttendance :one
 SELECT id, employee_id, shift_id, client_id, check_in_at, check_in_lat, check_in_lng, check_in_photo_url, check_out_at, check_out_lat, check_out_lng, check_out_photo_url, status, created_at, updated_at, break_started_at FROM attendance_records WHERE id = $1
 `

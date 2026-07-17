@@ -36,6 +36,22 @@ WHERE client_id = sqlc.arg('client_id')
   AND status IN ('checked_in', 'on_break')
 RETURNING *;
 
+-- name: DeleteAttendanceByShiftIDs :execrows
+-- Demo tooling: remove attendance linked to the given (seeded) shifts.
+DELETE FROM attendance_records WHERE shift_id = ANY($1::uuid[]);
+
+-- name: CreateDemoAttendance :one
+-- Demo tooling: insert a fully specified attendance record (fabricated
+-- timestamps/state), unlike CreateCheckIn which always stamps now().
+INSERT INTO attendance_records (
+    employee_id, shift_id, client_id,
+    check_in_at, check_in_lat, check_in_lng,
+    check_out_at, check_out_lat, check_out_lng,
+    break_started_at, status
+)
+VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11)
+RETURNING *;
+
 -- name: ListAttendanceByShiftIDs :many
 -- Fetch attendance linked to any of the given shifts, regardless of check-in
 -- time (used by the live view to join shifts to their current attendance state

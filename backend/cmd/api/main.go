@@ -13,6 +13,7 @@ import (
 
 	"github.com/davidnguyen2205/opero/backend/internal/attendance"
 	"github.com/davidnguyen2205/opero/backend/internal/controlplane"
+	"github.com/davidnguyen2205/opero/backend/internal/demoseed"
 	"github.com/davidnguyen2205/opero/backend/internal/identity"
 	"github.com/davidnguyen2205/opero/backend/internal/leave"
 	"github.com/davidnguyen2205/opero/backend/internal/liveview"
@@ -86,6 +87,12 @@ func run() error {
 	toursService := tours.NewService(logger)
 	toursHandler := tours.NewHandler(toursService, logger)
 
+	// demoseed owns no tables; it composes identity + roster + attendance +
+	// tours to rebuild the demo tenant's live-view data. Gated to the tenant
+	// named by DEMO_TENANT_SLUG (empty = disabled).
+	demoseedService := demoseed.NewService(identityService, rosterService, attendanceService, toursService)
+	demoseedHandler := demoseed.NewHandler(demoseedService, cpService, cfg.DemoTenantSlug, logger)
+
 	// Object storage for media uploads (check-in photos). Keyed by tenant_id;
 	// no tenant DB pool needed, so /media is secured but not a tenant route.
 	objectStore, err := storage.NewMinioStore(storage.Config{
@@ -105,7 +112,7 @@ func run() error {
 	api := &apiHandler{
 		cp: cpHandler, id: identityHandler, rs: rosterHandler, at: attendanceHandler,
 		lv: liveviewHandler, lv2: leaveHandler, st: statsHandler, tr: toursHandler,
-		md: mediaHandler,
+		md: mediaHandler, ds: demoseedHandler,
 	}
 
 	handler := httpserver.New(httpserver.Deps{
@@ -116,7 +123,7 @@ func run() error {
 		TenantRegistry:      store,          // controlplane.Store: tenant_id -> db_name
 		TenantPools:         tenantResolver, // db.TenantResolver: db_name -> pool
 		CORSAllowedOrigins:  cfg.CORSAllowedOrigins,
-		TenantRoutePrefixes: []string{"/departments", "/employees", "/roles", "/shifts", "/locations", "/attendance", "/live", "/leave", "/tours", "/me/shifts", "/me/leave", "/me/stats"},
+		TenantRoutePrefixes: []string{"/departments", "/employees", "/roles", "/shifts", "/locations", "/attendance", "/live", "/leave", "/tours", "/demo", "/me/shifts", "/me/leave", "/me/stats"},
 	})
 
 	srv := &http.Server{

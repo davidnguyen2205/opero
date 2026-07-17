@@ -18,6 +18,8 @@ type repo interface {
 	SetStatus(ctx context.Context, clientID uuid.UUID, status string) (Record, error)
 	List(ctx context.Context, f AttendanceFilter) ([]Record, error)
 	ListByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) ([]Record, error)
+	CreateDemoRecord(ctx context.Context, in DemoRecordInput) (Record, error)
+	DeleteByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) (int64, error)
 }
 
 // EmployeeResolver maps a control-plane user id to its tenant employee id.
@@ -190,6 +192,35 @@ func (s *Service) SetBreak(ctx context.Context, userID, clientID uuid.UUID, onBr
 		return Record{}, fmt.Errorf("%w: shift is not open", ErrValidation)
 	}
 	return st.SetStatus(ctx, clientID, target)
+}
+
+// SeedDemoRecord inserts a fabricated attendance record. Demo tooling only —
+// bypasses the check-in ownership/idempotency rules on purpose so the seeder
+// can construct arbitrary states (already checked out, mid-break, …).
+func (s *Service) SeedDemoRecord(ctx context.Context, in DemoRecordInput) (Record, error) {
+	switch in.Status {
+	case "checked_in", "checked_out", "on_break", "missed":
+	default:
+		return Record{}, fmt.Errorf("%w: invalid status %q", ErrValidation, in.Status)
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return Record{}, err
+	}
+	return st.CreateDemoRecord(ctx, in)
+}
+
+// DeleteByShiftIDs removes attendance linked to the given shifts. Demo
+// tooling only (the seeder clears records tied to its tagged shifts).
+func (s *Service) DeleteByShiftIDs(ctx context.Context, shiftIDs []uuid.UUID) (int64, error) {
+	if len(shiftIDs) == 0 {
+		return 0, nil
+	}
+	st, err := s.newStore(ctx)
+	if err != nil {
+		return 0, err
+	}
+	return st.DeleteByShiftIDs(ctx, shiftIDs)
 }
 
 func (s *Service) List(ctx context.Context, f AttendanceFilter) ([]Record, error) {
